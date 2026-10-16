@@ -10,7 +10,7 @@ Payment decisions have to balance correctness, fraud signals, and latency under 
 
 ## Run locally
 
-You need Docker Desktop, Java 21, Python 3.12, uv, Node.js.
+You need Docker Desktop, Java 17, Python 3.12, uv, Node.js.
 
 ```sh
 make up
