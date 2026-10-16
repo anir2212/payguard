@@ -1,0 +1,12 @@
+FROM eclipse-temurin:17-jdk AS build
+WORKDIR /work
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+COPY gradle ./gradle
+COPY src ./src
+RUN chmod +x ./gradlew && ./gradlew installDist --no-daemon
+
+FROM eclipse-temurin:17-jre
+WORKDIR /opt/payguard
+COPY --from=build /work/build/install/payguard ./
+EXPOSE 8086
+CMD ["bin/payguard"]

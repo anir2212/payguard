@@ -1,0 +1,295 @@
+openapi: 3.1.0
+info:
+  title: PayGuard local card issuing API
+  version: 0.1.0
+  description: Local synthetic-token demo. No real PANs or production authentication.
+servers:
+  - url: http://127.0.0.1:8086
+paths:
+  /health:
+    get:
+      summary: Process liveness
+      responses:
+        '200': {description: Healthy}
+  /metrics:
+    get:
+      summary: Prometheus text metrics for authorization outcomes and duration
+      responses:
+        '200':
+          description: Prometheus exposition text
+          content:
+            text/plain:
+              schema: {type: string}
+  /v1/cards:
+    post:
+      summary: Issue a synthetic card and fund its demo balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IssueCardRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/Operation'}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/cards/{cardId}:
+    get:
+      summary: Read card state and derived available balance
+      parameters:
+        - {$ref: '#/components/parameters/CardId'}
+      responses:
+        '200':
+          description: Card
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CardView'}
+  /v1/cards/{cardId}/state:
+    patch:
+      summary: Apply a legal lifecycle transition
+      parameters:
+        - {$ref: '#/components/parameters/CardId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, idempotencyKey]
+              properties:
+                state: {type: string, enum: [CREATED, ACTIVE, FROZEN, LOST, STOLEN, CANCELLED]}
+                idempotencyKey: {type: string}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+  /v1/cards/{cardId}/controls:
+    put:
+      summary: Replace spend controls
+      parameters:
+        - {$ref: '#/components/parameters/CardId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SetControlsRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+  /v1/cards/{cardId}/transactions:
+    get:
+      summary: Latest 100 approved authorizations
+      parameters:
+        - {$ref: '#/components/parameters/CardId'}
+      responses:
+        '200': {description: Transaction list}
+  /v1/authorizations:
+    post:
+      summary: Authorize or decline a synthetic payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthorizeRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/authorizations/recent:
+    get:
+      summary: Read the latest 100 committed authorization events from the outbox
+      responses:
+        '200':
+          description: Events for the local analyst console
+          content:
+            application/json:
+              schema: {type: array, items: {type: object}}
+  /v1/captures:
+    post:
+      summary: Capture some or all of an open hold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaptureRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+  /v1/reversals:
+    post:
+      summary: Release the uncaptured portion of a hold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReverseRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+  /v1/refunds:
+    post:
+      summary: Refund some or all of a captured amount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Operation'}
+  /v1/settlements/sample:
+    get:
+      summary: Generate a network-shaped CSV from captures on a UTC date
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Synthetic CSV with capture_id,amount_minor,currency header
+          content:
+            text/csv:
+              schema: {type: string}
+  /v1/settlements/reconcile:
+    post:
+      summary: Compare a synthetic network CSV against captured ledger amounts
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+      responses:
+        '200':
+          description: Matched and discrepant captures
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SettlementReport'}
+components:
+  parameters:
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      schema: {type: string, pattern: '^card_'}
+  responses:
+    Operation:
+      description: Idempotent operation result
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/OperationResult'}
+    Error:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: {type: string}
+  schemas:
+    SettlementReport:
+      type: object
+      required: [settlementDate, matched, missingNetwork, missingLedger, amountMismatch, duplicate, items]
+      properties:
+        settlementDate: {type: string, format: date}
+        matched: {type: integer}
+        missingNetwork: {type: integer}
+        missingLedger: {type: integer}
+        amountMismatch: {type: integer}
+        duplicate: {type: integer}
+        items:
+          type: array
+          items:
+            type: object
+            required: [captureId, status]
+            properties:
+              captureId: {type: string}
+              status: {type: string, enum: [MATCHED, MISSING_NETWORK, MISSING_LEDGER, AMOUNT_MISMATCH, DUPLICATE]}
+              expectedMinor: {type: integer, format: int64, nullable: true}
+              observedMinor: {type: integer, format: int64, nullable: true}
+              expectedCurrency: {type: string, nullable: true}
+              observedCurrency: {type: string, nullable: true}
+    OperationResult:
+      type: object
+      required: [status, reference, reasons]
+      properties:
+        status: {type: string}
+        reference: {type: string}
+        amountMinor: {type: integer, format: int64, nullable: true}
+        currency: {type: string, nullable: true}
+        reasons: {type: array, items: {type: string}}
+        modelScore: {type: number, format: double, nullable: true, description: Calibrated fraud probability}
+        modelAction: {type: string, nullable: true, enum: [OFF, RULES_FALLBACK, SHADOW_DECLINE, SHADOW_APPROVE, MODEL_DECLINE, MODEL_APPROVE]}
+        modelReasonCodes: {type: array, items: {type: string}}
+        modelVersion: {type: string, nullable: true}
+    CardView:
+      type: object
+      required: [id, companyId, holder, state, currency, limitMinor, availableMinor]
+      properties:
+        id: {type: string}
+        companyId: {type: string}
+        holder: {type: string}
+        state: {type: string}
+        currency: {type: string}
+        limitMinor: {type: integer, format: int64}
+        availableMinor: {type: integer, format: int64}
+    IssueCardRequest:
+      type: object
+      required: [companyId, holder, limitMinor, idempotencyKey]
+      properties:
+        companyId: {type: string}
+        holder: {type: string}
+        currency: {type: string, default: SGD}
+        limitMinor: {type: integer, format: int64, minimum: 1}
+        idempotencyKey: {type: string}
+    SpendControls:
+      type: object
+      properties:
+        cardDailyMinor: {type: integer, format: int64, nullable: true}
+        cardMonthlyMinor: {type: integer, format: int64, nullable: true}
+        companyDailyMinor: {type: integer, format: int64, nullable: true}
+        companyMonthlyMinor: {type: integer, format: int64, nullable: true}
+        allowedMccs: {type: array, uniqueItems: true, items: {type: string}}
+        deniedMccs: {type: array, uniqueItems: true, items: {type: string}}
+        blockedMerchants: {type: array, uniqueItems: true, items: {type: string}}
+        allowedCountries: {type: array, uniqueItems: true, items: {type: string}}
+        velocityCount: {type: integer, minimum: 1}
+        velocitySeconds: {type: integer, minimum: 1}
+    SetControlsRequest:
+      type: object
+      required: [controls, idempotencyKey]
+      properties:
+        controls: {$ref: '#/components/schemas/SpendControls'}
+        idempotencyKey: {type: string}
+    AuthorizeRequest:
+      type: object
+      required: [authId, cardId, merchantId, mcc, country, currency, amountMinor, idempotencyKey]
+      properties:
+        authId: {type: string, pattern: '^auth_'}
+        cardId: {type: string, pattern: '^card_'}
+        merchantId: {type: string}
+        mcc: {type: string, pattern: '^[0-9]{4}$'}
+        country: {type: string, pattern: '^[A-Z]{2}$'}
+        currency: {type: string}
+        amountMinor: {type: integer, format: int64, minimum: 1}
+        deviceId: {type: string}
+        latitude: {type: number, format: double, minimum: -90, maximum: 90}
+        longitude: {type: number, format: double, minimum: -180, maximum: 180}
+        homeLatitude: {type: number, format: double, minimum: -90, maximum: 90}
+        homeLongitude: {type: number, format: double, minimum: -180, maximum: 180}
+        merchantRisk: {type: number, format: double, minimum: 0, maximum: 1}
+        priorRefundRatio: {type: number, format: double, minimum: 0, maximum: 1}
+        idempotencyKey: {type: string}
+    CaptureRequest:
+      type: object
+      required: [captureId, authId, amountMinor, idempotencyKey]
+      properties:
+        captureId: {type: string, pattern: '^cap_'}
+        authId: {type: string}
+        amountMinor: {type: integer, format: int64, minimum: 1}
+        idempotencyKey: {type: string}
+    ReverseRequest:
+      type: object
+      required: [authId, idempotencyKey]
+      properties:
+        authId: {type: string}
+        idempotencyKey: {type: string}
+    RefundRequest:
+      type: object
+      required: [refundId, captureId, amountMinor, idempotencyKey]
+      properties:
+        refundId: {type: string, pattern: '^ref_'}
+        captureId: {type: string}
+        amountMinor: {type: integer, format: int64, minimum: 1}
+        idempotencyKey: {type: string}

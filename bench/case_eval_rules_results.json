@@ -1,0 +1,416 @@
+{
+  "fixture": "40 generated synthetic cases from six hand-built templates",
+  "modelRequested": null,
+  "cases": 40,
+  "elapsedSeconds": 0.017,
+  "patternAccuracy": 1.0,
+  "actionAgreement": 1.0,
+  "hallucinatedIdRate": 0.0,
+  "draftSources": {
+    "rules_fallback": 40
+  },
+  "allPendingAnalyst": true,
+  "rows": [
+    {
+      "caseId": "case_000",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_001",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_002",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_003",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_004",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_005",
+      "expectedPattern": "card_testing",
+      "predictedPattern": "card_testing",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_006",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_007",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_008",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_009",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_010",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_011",
+      "expectedPattern": "account_takeover",
+      "predictedPattern": "account_takeover",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_012",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_013",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_014",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_015",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_016",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_017",
+      "expectedPattern": "merchant_collusion",
+      "predictedPattern": "merchant_collusion",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_018",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_019",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_020",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_021",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_022",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_023",
+      "expectedPattern": "refund_abuse",
+      "predictedPattern": "refund_abuse",
+      "expectedAction": "contact_customer",
+      "predictedAction": "contact_customer",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_024",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_025",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_026",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_027",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_028",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_029",
+      "expectedPattern": "velocity_burst",
+      "predictedPattern": "velocity_burst",
+      "expectedAction": "freeze_card",
+      "predictedAction": "freeze_card",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_030",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_031",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_032",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_033",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_034",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_035",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_036",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_037",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_038",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    },
+    {
+      "caseId": "case_039",
+      "expectedPattern": "benign",
+      "predictedPattern": "benign",
+      "expectedAction": "no_action",
+      "predictedAction": "no_action",
+      "draftSource": "rules_fallback",
+      "hallucinatedIds": [],
+      "approvalStatus": "PENDING_ANALYST"
+    }
+  ],
+  "limit": "Template cases and rule fallback are easier than live analyst investigations; this does not measure real-world fraud accuracy or analyst preference."
+}

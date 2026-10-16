@@ -1,0 +1,11 @@
+.git
+.gradle
+.gradle-user-home
+.kotlin
+build
+frontend
+fraud
+data
+bench
+legacy
+*.md

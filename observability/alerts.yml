@@ -1,0 +1,18 @@
+groups:
+  - name: payguard-local
+    rules:
+      - alert: PayGuardScoringDistributionDrift
+        expr: payguard_model_score_psi > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recent model score distribution differs from validation baseline"
+          description: "PSI over the last 1000 scored requests exceeds 0.2; inspect traffic mix and model inputs."
+      - alert: PayGuardScoringUnavailable
+        expr: up{job="payguard-score"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PayGuard scoring endpoint is unavailable"

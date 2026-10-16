@@ -1,0 +1,1 @@
+{"settlementDate":"2026-10-11","matched":1,"missingNetwork":0,"missingLedger":0,"amountMismatch":0,"duplicate":0,"items":[{"captureId":"cap_ea38ece4-454a-49c5-9010-c2c4cc7af30e","status":"MATCHED","expectedMinor":1250,"observedMinor":1250,"expectedCurrency":"SGD","observedCurrency":"SGD"}]}
