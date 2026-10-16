@@ -1,0 +1,172 @@
+name: payguard
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: payguard
+      POSTGRES_USER: payguard
+      POSTGRES_PASSWORD: local-demo-only
+    ports: ["127.0.0.1:15439:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payguard -d payguard"]
+      interval: 3s
+      retries: 20
+  redis:
+    image: redis:7.4-alpine
+    profiles: [stream]
+    command: redis-server --appendonly yes
+    ports: ["127.0.0.1:16379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+  kafka:
+    image: apache/kafka:3.9.1
+    profiles: [stream]
+    hostname: kafka
+    environment:
+      CLUSTER_ID: YY-tcULWCNebr0MdXYxiJg
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:19094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports: ["127.0.0.1:19094:9094"]
+    volumes: [kafkadata:/var/lib/kafka/data]
+  kafka-init:
+    image: apache/kafka:3.9.1
+    profiles: [packaged]
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list;
+        do sleep 2; done;
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092
+        --create --if-not-exists --topic payguard.authorization
+        --partitions 6 --replication-factor 1
+    depends_on: [kafka]
+  api:
+    image: payguard-api:local
+    build: {context: ., dockerfile: Dockerfile.api}
+    profiles: [packaged]
+    environment:
+      PAYGUARD_JDBC_URL: jdbc:postgresql://postgres:5432/payguard
+      PAYGUARD_DB_USER: payguard
+      PAYGUARD_DB_PASSWORD: local-demo-only
+      PAYGUARD_MODEL_MODE: enforce
+      PAYGUARD_SCORE_URL: http://score:18086/score
+    ports: ["127.0.0.1:8086:8086"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      score: {condition: service_healthy}
+  outbox:
+    image: payguard-api:local
+    profiles: [packaged]
+    command: ["java", "-cp", "lib/*", "com.payguard.service.OutboxMainKt"]
+    environment:
+      PAYGUARD_JDBC_URL: jdbc:postgresql://postgres:5432/payguard
+      PAYGUARD_DB_USER: payguard
+      PAYGUARD_DB_PASSWORD: local-demo-only
+      PAYGUARD_KAFKA_BROKERS: kafka:9092
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+  score:
+    image: payguard-score:local
+    build: {context: ./fraud, dockerfile: Dockerfile}
+    profiles: [packaged]
+    environment:
+      PAYGUARD_REDIS_URL: redis://redis:6379/0
+    ports: ["127.0.0.1:18086:18086"]
+    depends_on:
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18086/health', timeout=5)"]
+      interval: 3s
+      start_period: 10s
+      retries: 20
+  features:
+    image: payguard-score:local
+    profiles: [packaged]
+    command: [".venv/bin/python", "-m", "payguard_fraud.feature_stream"]
+    environment:
+      PAYGUARD_REDIS_URL: redis://redis:6379/0
+      PAYGUARD_KAFKA_BROKERS: kafka:9092
+    depends_on:
+      redis: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+  cases-api:
+    image: payguard-score:local
+    profiles: [packaged]
+    command: [".venv/bin/uvicorn", "payguard_fraud.case_api:app", "--host", "0.0.0.0", "--port", "18087"]
+    environment:
+      PAYGUARD_CASE_DB: /data/cases.sqlite
+      PAYGUARD_CASE_MODEL: qwen2.5:0.5b
+      PAYGUARD_OLLAMA_URL: http://host.docker.internal:11434/api/generate
+    ports: ["127.0.0.1:18087:18087"]
+    volumes: [casesdata:/data]
+  cases-worker:
+    image: payguard-score:local
+    profiles: [packaged]
+    command: [".venv/bin/python", "-m", "payguard_fraud.case_stream"]
+    environment:
+      PAYGUARD_CASE_DB: /data/cases.sqlite
+      PAYGUARD_KAFKA_BROKERS: kafka:9092
+    volumes: [casesdata:/data]
+    depends_on:
+      kafka-init: {condition: service_completed_successfully}
+  console:
+    image: payguard-console:local
+    build: {context: ./frontend, dockerfile: Dockerfile}
+    profiles: [packaged]
+    ports: ["127.0.0.1:18119:80"]
+    depends_on: [api, cases-api]
+  simulator:
+    image: payguard-score:local
+    profiles: [simulate]
+    command: [".venv/bin/python", "-m", "payguard_fraud.demo"]
+    environment:
+      PAYGUARD_API_URL: http://api:8086
+      PAYGUARD_REDIS_URL: redis://redis:6379/0
+      PAYGUARD_CASE_API_URL: http://cases-api:18087
+    volumes: [./bench:/opt/payguard/bench]
+    depends_on: [api, cases-worker, features, outbox]
+  prometheus:
+    image: prom/prometheus@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    profiles: [observe]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=3d"]
+    ports: ["127.0.0.1:19090:9090"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheusdata:/prometheus
+  grafana:
+    image: grafana/grafana@sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7
+    profiles: [observe]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: local-demo-only
+    ports: ["127.0.0.1:13000:3000"]
+    volumes:
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/payguard.yml:ro
+      - ./observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/payguard.yml:ro
+      - ./observability/grafana/payguard.json:/var/lib/grafana/dashboards/payguard.json:ro
+      - grafanadata:/var/lib/grafana
+    depends_on: [prometheus]
+volumes:
+  pgdata: {}
+  redisdata: {}
+  kafkadata: {}
+  prometheusdata: {}
+  grafanadata: {}
+  casesdata: {}

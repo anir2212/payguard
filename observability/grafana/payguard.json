@@ -1,0 +1,19 @@
+{
+  "uid": "payguard-local",
+  "title": "PayGuard local risk operations",
+  "tags": ["payguard", "local-demo"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id": 1, "title": "Authorization rate", "type": "timeseries", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "sum by (status) (rate(payguard_authorizations_total[1m]))", "legendFormat": "{{status}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
+    {"id": 2, "title": "Authorization p95 latency", "type": "timeseries", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(payguard_auth_duration_seconds_bucket[5m])))", "legendFormat": "p95"}], "fieldConfig": {"defaults": {"unit": "s"}}},
+    {"id": 3, "title": "Decline ratio", "type": "stat", "gridPos": {"x": 0, "y": 8, "w": 6, "h": 5}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "sum(rate(payguard_authorizations_total{status=\"DECLINED\"}[5m])) / clamp_min(sum(rate(payguard_authorizations_total{status=~\"APPROVED|DECLINED\"}[5m])), 0.000001)"}], "fieldConfig": {"defaults": {"unit": "percentunit"}}},
+    {"id": 4, "title": "Rules fallback rate", "type": "stat", "gridPos": {"x": 6, "y": 8, "w": 6, "h": 5}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "sum(rate(payguard_model_decisions_total{action=\"RULES_FALLBACK\"}[5m]))"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
+    {"id": 5, "title": "Scoring p95 latency", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(payguard_scoring_duration_seconds_bucket[5m])))", "legendFormat": "p95"}], "fieldConfig": {"defaults": {"unit": "s"}}},
+    {"id": 6, "title": "Score distribution", "type": "timeseries", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "sum by (le) (rate(payguard_online_score_bucket[5m]))", "legendFormat": "≤ {{le}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
+    {"id": 7, "title": "Score drift PSI (100+ samples)", "type": "timeseries", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "payguard-prometheus"}, "targets": [{"expr": "payguard_model_score_psi", "legendFormat": "PSI"}], "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 0.2}]}}}}
+  ]
+}

@@ -1,0 +1,195 @@
+{
+    "metrics": {
+        "data_received": {
+            "count": 437206,
+            "rate": 28210.697205037075
+        },
+        "auth_duration": {
+            "p(50)": 6.955,
+            "p(95)": 8.931,
+            "p(99)": 31.583,
+            "avg": 7.274556962025318,
+            "min": 4.574,
+            "med": 6.955,
+            "max": 72.864
+        },
+        "http_req_connecting": {
+            "avg": 0.0045875227135069654,
+            "min": 0,
+            "med": 0,
+            "max": 0.446,
+            "p(50)": 0,
+            "p(95)": 0,
+            "p(99)": 0.20899999999999996
+        },
+        "auth_approved": {
+            "count": 1500,
+            "rate": 96.78743157128588
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 66.664,
+            "p(50)": 6.829000000000001,
+            "p(95)": 8.81415,
+            "p(99)": 26.334999999999877,
+            "avg": 6.86106484848485,
+            "min": 2.049,
+            "med": 6.829000000000001
+        },
+        "iterations": {
+            "count": 1501,
+            "rate": 96.85195652566674
+        },
+        "data_sent": {
+            "count": 644242,
+            "rate": 41569.68566023224
+        },
+        "vus_max": {
+            "value": 34,
+            "min": 34,
+            "max": 34
+        },
+        "auth_errors": {
+            "count": 1,
+            "rate": 0.06452495438085726
+        },
+        "http_req_blocked": {
+            "avg": 0.00973349485160529,
+            "min": 0.001,
+            "med": 0.004,
+            "max": 1.738,
+            "p(50)": 0.004,
+            "p(95)": 0.009,
+            "p(99)": 0.23249999999999998
+        },
+        "iteration_duration": {
+            "max": 73.037333,
+            "p(50)": 7.173583,
+            "p(95)": 9.163459,
+            "p(99)": 31.675333,
+            "avg": 7.451052782145238,
+            "min": 4.628667,
+            "med": 7.173583
+        },
+        "http_req_tls_handshaking": {
+            "p(50)": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0
+        },
+        "http_req_failed": {
+            "passes": 1,
+            "fails": 1650,
+            "value": 0.0006056935190793458
+        },
+        "http_req_duration": {
+            "max": 72.864,
+            "p(50)": 6.83,
+            "p(95)": 8.8295,
+            "p(99)": 30.473,
+            "avg": 6.901042398546338,
+            "min": 2.049,
+            "med": 6.83
+        },
+        "http_reqs": {
+            "count": 1651,
+            "rate": 106.53069968279532
+        },
+        "http_req_sending": {
+            "p(95)": 0.028,
+            "p(99)": 0.044,
+            "avg": 0.016183525136280966,
+            "min": 0.003,
+            "med": 0.017,
+            "max": 0.668,
+            "p(50)": 0.017
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 1
+        },
+        "http_req_waiting": {
+            "avg": 6.846407631738339,
+            "min": 2.023,
+            "med": 6.77,
+            "max": 72.795,
+            "p(50)": 6.77,
+            "p(95)": 8.742499999999998,
+            "p(99)": 30.4485
+        },
+        "http_req_receiving": {
+            "min": 0.007,
+            "med": 0.035,
+            "max": 0.24,
+            "p(50)": 0.035,
+            "p(95)": 0.07649999999999993,
+            "p(99)": 0.12949999999999998,
+            "avg": 0.038451241671714036
+        }
+    },
+    "setup_data": {
+        "cardIds": [
+            "card_8a7d5648-4054-4e41-9d37-286900d4e069",
+            "card_017091df-2482-4f89-834c-048382a8e37c",
+            "card_6c5647af-d8db-43b0-a332-ec296ca281e4",
+            "card_e9aa283b-a60f-4037-bab4-d52a223c3ccf",
+            "card_fb2589b9-ec8a-43f5-960a-b5f5a1123c6c",
+            "card_a09b2d0a-8c58-48f9-9120-bbf657a238e5",
+            "card_ea4bb6b5-9b8f-486e-8603-c8085cd172d9",
+            "card_9072553d-4c23-4d94-a904-081cf72cda6f",
+            "card_83eafd85-bbb5-4977-80cb-fd703984c6e9",
+            "card_635c9079-d25e-4be2-a003-bee06e47b0f9",
+            "card_b2d89c02-60af-462b-9c03-1366a0f7dfe8",
+            "card_a94196e1-99c4-4881-9f6b-e9bf6deeb996",
+            "card_3774ce52-6c8a-4ab4-89fd-319e15a59026",
+            "card_2b0845fd-1a9f-4c63-a2d0-9309b7ddd35c",
+            "card_2e99fe4b-86eb-4380-bd1f-49664720f6be",
+            "card_af9e8ba4-69a4-4201-853a-0047daf3222f",
+            "card_28fefcfa-6e08-4f70-b6a6-ce93df7ca365",
+            "card_f99972cf-84f4-4fa5-88af-5301f8c30fcd",
+            "card_72119fa7-8196-422a-a3ac-ac83d85962df",
+            "card_ad507b95-b1c8-4d82-a05a-826fc6d49f97",
+            "card_3af9038d-f595-49f8-b207-11d166c99d6f",
+            "card_d8b5f85b-2db8-45e9-812c-763569c808d0",
+            "card_2153fcf2-fac8-4a9e-82d7-b6a54aa839d1",
+            "card_885e64be-6bd1-4fe5-bbea-6f456305e801",
+            "card_554b08b8-d906-434b-ae5b-cb145664a3d7",
+            "card_11e92097-829b-4568-b894-91b49a043050",
+            "card_5ab8fede-ce6d-48ac-b8ac-6a2d1c619545",
+            "card_538184e4-3467-45a1-9eff-9a34a390db46",
+            "card_af629492-1b67-4077-9893-1c3921d08300",
+            "card_6d96cc52-7222-4375-8eda-ee0778e33991",
+            "card_4e0223ba-8261-46a0-995c-6384e454e096",
+            "card_8d106268-c6bd-4317-9d06-b75efad6e3cf",
+            "card_fb5046eb-1eea-486b-98b1-f2fc01d1880b",
+            "card_c1d0bcf8-4d38-4fff-b0f4-949c5eb6c493",
+            "card_a74438a4-6146-4252-b434-103cdfc03122",
+            "card_9afbc177-05e6-4b76-a357-a572646776f9",
+            "card_c33c54b1-462a-4cde-9383-6f0592136a8e",
+            "card_32094071-37af-4f3c-bfcb-a7a91872955b",
+            "card_338ff712-7921-425a-ac47-d591d54f2367",
+            "card_cb776ec6-7c9b-4b60-8116-6ca8fb2eb362",
+            "card_3a9c51ca-f024-4dbe-9454-8057797402cc",
+            "card_582a2741-c41e-4a91-8191-49ecd5ae8769",
+            "card_dc3d26db-4b35-4ffd-82bc-21df4d5be174",
+            "card_b846fd95-b981-4f4c-a034-fc00917806c7",
+            "card_51e21dba-4542-4584-ab9a-bf3c647d2843",
+            "card_2a0f1f7c-7129-4344-8eae-fead883ab441",
+            "card_def2aebc-7a15-4a3d-955e-ca0c0574898f",
+            "card_7ad1fb4a-a35a-4bab-b0d7-33e883205207",
+            "card_3a787078-a58e-41e8-b4d2-7164f24e783d",
+            "card_0c2cfff1-b0cc-4075-8719-bca78d7a6859"
+        ],
+        "runId": "1791707366745"
+    },
+    "root_group": {
+        "checks": {},
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    }
+}

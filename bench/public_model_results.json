@@ -1,0 +1,89 @@
+{
+  "source": "OpenML 43627; see data/SOURCES.md",
+  "note": "Different feature contract from synthetic model; no cross-dataset transfer claim",
+  "split": {
+    "train": 170882,
+    "validation": 56963,
+    "test": 56962
+  },
+  "frauds": {
+    "train": 360,
+    "validation": 57,
+    "test": 75
+  },
+  "features": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "V16",
+    "V17",
+    "V18",
+    "V19",
+    "V20",
+    "V21",
+    "V22",
+    "V23",
+    "V24",
+    "V25",
+    "V26",
+    "V27",
+    "V28",
+    "Amount"
+  ],
+  "logistic": {
+    "rows": 56962,
+    "frauds": 75,
+    "pr_auc": 0.7614411038410898,
+    "brier": 0.00045942839623378467,
+    "cost_threshold": 0.017142857142857144,
+    "cost_minor": 408428,
+    "recall_at_cost_threshold": 0.8533333333333334,
+    "fpr_at_cost_threshold": 0.003990366867649903,
+    "amount_weighted_recall": 0.6937248844003178,
+    "recall_at_0_5pct_fpr": 0.8933333333333333,
+    "actual_fpr_at_0_5pct_fpr": 0.023239052859176965,
+    "amount_weighted_recall_at_0_5pct_fpr": 0.6970861376121388,
+    "recall_at_1pct_fpr": 0.8933333333333333,
+    "actual_fpr_at_1pct_fpr": 0.023239052859176965,
+    "amount_weighted_recall_at_1pct_fpr": 0.6970861376121388,
+    "validation_cost_minor": 530871,
+    "fpr_thresholds": {
+      "0_5pct_fpr": 0.001388888888888889,
+      "1pct_fpr": 0.001388888888888889
+    }
+  },
+  "lightgbm": {
+    "rows": 56962,
+    "frauds": 75,
+    "pr_auc": 0.7733481274017422,
+    "brier": 0.00048135851491529777,
+    "cost_threshold": 0.02631578947368421,
+    "cost_minor": 359499,
+    "recall_at_cost_threshold": 0.8,
+    "fpr_at_cost_threshold": 0.0021270237488354104,
+    "amount_weighted_recall": 0.6599946178547493,
+    "recall_at_0_5pct_fpr": 0.88,
+    "actual_fpr_at_0_5pct_fpr": 0.02132297361435829,
+    "amount_weighted_recall_at_0_5pct_fpr": 0.7780395535924526,
+    "recall_at_1pct_fpr": 0.88,
+    "actual_fpr_at_1pct_fpr": 0.02132297361435829,
+    "amount_weighted_recall_at_1pct_fpr": 0.7780395535924526,
+    "validation_cost_minor": 477190,
+    "fpr_thresholds": {
+      "0_5pct_fpr": 0.0008503401360544217,
+      "1pct_fpr": 0.0008503401360544217
+    }
+  }
+}

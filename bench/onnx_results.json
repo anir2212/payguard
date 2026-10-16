@@ -1,0 +1,11 @@
+{
+  "samples_checked": 1000,
+  "max_raw_probability_error": 0.0007476670151558857,
+  "max_calibrated_probability_error": 5.746604496415647e-06,
+  "single_row_onnx_inference_ms": {
+    "p50": 0.007417,
+    "p95": 0.007834,
+    "p99": 0.008
+  },
+  "note": "In-process CPU inference only; excludes HTTP, Redis, feature lookup and Kotlin caller"
+}

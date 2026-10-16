@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: PayGuard
+    orgId: 1
+    folder: PayGuard
+    type: file
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,153 @@
+{
+  "scenario": "synthetic card-testing burst with 20 normal prior transactions",
+  "cardId": "card_ed630aa9-16a5-4934-a7f6-867b9acf44c8",
+  "decisions": [
+    {
+      "authId": "auth_demo_14ba2f75c5_0",
+      "status": "APPROVED",
+      "modelScore": null,
+      "modelAction": "RULES_FALLBACK",
+      "reasons": [],
+      "modelReasonCodes": [],
+      "apiMs": 108.76,
+      "featurePropagationMs": 148.41
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_1",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 87.66,
+      "featurePropagationMs": 130.55
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_2",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 17.35,
+      "featurePropagationMs": 87.02
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_3",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 44.08,
+      "featurePropagationMs": 66.56
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_4",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 19.45,
+      "featurePropagationMs": 84.69
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_5",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 45.25,
+      "featurePropagationMs": 63.91
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_6",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 17.63,
+      "featurePropagationMs": 105.7
+    },
+    {
+      "authId": "auth_demo_14ba2f75c5_7",
+      "status": "DECLINED",
+      "modelScore": 1.0,
+      "modelAction": "MODEL_DECLINE",
+      "reasons": [
+        "fraud_score"
+      ],
+      "modelReasonCodes": [
+        "seconds_since_last",
+        "log_amount",
+        "count_1m"
+      ],
+      "apiMs": 11.33,
+      "featurePropagationMs": 84.62
+    }
+  ],
+  "firstModelDeclineIndex": 1,
+  "caseDraft": {
+    "caseId": "case_auth_demo_14ba2f75c5_7",
+    "pattern": "card_testing",
+    "recommendedAction": "freeze_card",
+    "confidence": 0.9,
+    "claims": [
+      {
+        "text": "Observed card testing signals in recent activity.",
+        "citations": [
+          "auth_demo_14ba2f75c5_0",
+          "auth_demo_14ba2f75c5_1",
+          "auth_demo_14ba2f75c5_2",
+          "auth_demo_14ba2f75c5_3",
+          "auth_demo_14ba2f75c5_4",
+          "auth_demo_14ba2f75c5_5",
+          "auth_demo_14ba2f75c5_6",
+          "auth_demo_14ba2f75c5_7"
+        ]
+      }
+    ],
+    "draftSource": "ollama",
+    "approvalStatus": "PENDING_ANALYST",
+    "summary": "Observed card testing signals in recent activity."
+  }
+}

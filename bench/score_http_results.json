@@ -1,0 +1,9 @@
+{
+  "description": "Sequential localhost HTTP POST /score, including Redis, ONNX, calibration, and reason codes",
+  "requests": 200,
+  "p50_ms": 4.34,
+  "p95_ms": 6.506,
+  "p99_ms": 8.863,
+  "max_ms": 15.43,
+  "note": "Sequential warm requests only; excludes Kotlin auth path and concurrent load"
+}
