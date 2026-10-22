@@ -258,15 +258,65 @@
   "6 or 8 scorer workers instead of 4 raised 850/s throughput by about 10% only; scorer CPU stayed near 285% regardless.",
   "The host itself was out of CPU: about 800% of container CPU plus k6, with macOS reporting 1-2% idle at 800/s. The ceiling of roughly 730/s on this laptop is total CPU shared by every service and the load generator, not one component.",
   "At 750/s the stack spent about 11 ms of CPU per authorization: scorer 3.7 ms, API 2.4 ms, PostgreSQL 1.5 ms, Kafka 1.4 ms, outbox 0.7 ms.",
-  "In process a score costs 0.61 ms, 0.56 ms of it LightGBM TreeSHAP for the reason codes; the scorer container's remaining ~3 ms per request is HTTP, FastAPI/pydantic, thread hand-off and Redis work."
+  "In process a score costs 0.61 ms, 0.56 ms of it LightGBM TreeSHAP for the reason codes. Alone at 500/s the scorer container used 1.2 ms of CPU per request, so serving adds about 0.6 ms; the ~3.7 ms per authorization seen at saturation is mostly the cost of CPU contention, not serving code."
  ],
  "next": [
   "Run the load generator on a separate machine so it does not compete for the CPU it measures.",
-  "Cut per-request scorer overhead: measure an async endpoint with an async Redis client, a leaner JSON path, or batched scoring; TreeSHAP is about 15% of the scorer's CPU and could be computed only for declines or reviews.",
+  "Lower CPU per authorization across services: TreeSHAP only where reason codes are shown (about half of the scorer's own 1.2 ms), and re-test httptools/uvloop with more repeats (6-18% on the scorer alone).",
   "Give Kafka and the outbox a CPU budget check; together they use about 2 ms of CPU per authorization."
  ],
  "limits": [
   "One machine; the samplers add load; single runs per setting.",
   "Synthetic workload and model; not a production capacity claim."
- ]
+ ],
+ "scorer_alone_500_per_s": {
+  "what": "k6 sending the same request mix straight to the scorer at 500/s for 20 s, with only Redis and the scorer running (4 workers x 1 thread); docker stats sampled 10 times during each run. Order: base, fast, base, fast, each on a fresh project.",
+  "runs": [
+   {
+    "label": "ab_base_1",
+    "server": "uvicorn h11 + asyncio (current)",
+    "completed": 10000,
+    "dropped": 0,
+    "errors": 0,
+    "p50_ms": 1.9,
+    "p99_ms": 11.7,
+    "score_container_cpu_pct": 62,
+    "cpu_ms_per_request": 1.23
+   },
+   {
+    "label": "ab_fast_2",
+    "server": "uvicorn httptools 0.7.1 + uvloop 0.22.1 (throwaway image)",
+    "completed": 10001,
+    "dropped": 0,
+    "errors": 0,
+    "p50_ms": 1.7,
+    "p99_ms": 3.5,
+    "score_container_cpu_pct": 50,
+    "cpu_ms_per_request": 1.01
+   },
+   {
+    "label": "ab_base_3",
+    "server": "uvicorn h11 + asyncio (current)",
+    "completed": 10000,
+    "dropped": 0,
+    "errors": 0,
+    "p50_ms": 1.9,
+    "p99_ms": 21.9,
+    "score_container_cpu_pct": 62,
+    "cpu_ms_per_request": 1.24
+   },
+   {
+    "label": "ab_fast_4",
+    "server": "uvicorn httptools 0.7.1 + uvloop 0.22.1 (throwaway image)",
+    "completed": 10000,
+    "dropped": 0,
+    "errors": 0,
+    "p50_ms": 1.7,
+    "p99_ms": 42.1,
+    "score_container_cpu_pct": 58,
+    "cpu_ms_per_request": 1.17
+   }
+  ],
+  "reading": "Alone, the scorer used 1.2 ms of CPU per request, of which 0.61 ms is the in-process score; HTTP, FastAPI/pydantic and the Redis lookup add about 0.6 ms. In the saturated full stack the same container used about 3.7 ms per authorization, so CPU contention roughly tripled the cost per request. The C HTTP parser and uvloop cut the scorer-alone cost by 18% in one pair and 6% in the other: too small and inconsistent to adopt on this evidence."
+ }
 }
