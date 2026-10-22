@@ -1,0 +1,272 @@
+{
+ "what": "Where the full scored path saturates above 500 authorizations a second, and why",
+ "date": "2026-10-22",
+ "follows": "bench/full_path_repeat_2026-10-22.json (4 scorer workers x 1 thread with the TCP_NODELAY fix, the Compose default)",
+ "hardware": "Apple M3 Pro, 11 cores, 18 GiB; Docker Desktop VM with 11 CPUs and 11.67 GiB; k6 2.3.0 natively on the same Mac",
+ "method": "Each run on a fresh Compose project (payguard_bench) with new volumes, a 15 s warm-up at 100/s, then a measured 15 s run of bench/load_full.js. During each run pg_stat_activity was sampled about every 0.4 s for the API's connections and docker stats was sampled continuously; both samplers add some load of their own. Single runs per setting.",
+ "runs": [
+  {
+   "label": "d600",
+   "offered_per_s": 600,
+   "scorer_workers": 4,
+   "threads_per_worker": 1,
+   "completed": 9001,
+   "dropped_iterations": 0,
+   "auth_errors": 0,
+   "p50_ms": 20.7,
+   "p95_ms": 208.1,
+   "p99_ms": 394.4,
+   "rules_fallback": 225,
+   "api_pool": {
+    "samples": 25,
+    "mean_active": 2.6,
+    "mean_idle_in_transaction": 12.8,
+    "mean_idle": 4.5
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 732,
+    "per_container_pct": {
+     "score": 230,
+     "api": 166,
+     "kafka": 128,
+     "postgres": 84,
+     "outbox": 49,
+     "features": 39,
+     "cases-worker": 24,
+     "redis": 11,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  },
+  {
+   "label": "d700",
+   "offered_per_s": 700,
+   "scorer_workers": 4,
+   "threads_per_worker": 1,
+   "completed": 10501,
+   "dropped_iterations": 0,
+   "auth_errors": 0,
+   "p50_ms": 35.6,
+   "p95_ms": 234.7,
+   "p99_ms": 409.2,
+   "rules_fallback": 263,
+   "api_pool": {
+    "samples": 28,
+    "mean_active": 3.0,
+    "mean_idle_in_transaction": 14.4,
+    "mean_idle": 2.6
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 740,
+    "per_container_pct": {
+     "score": 253,
+     "api": 165,
+     "kafka": 111,
+     "postgres": 89,
+     "outbox": 44,
+     "features": 41,
+     "cases-worker": 25,
+     "redis": 12,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  },
+  {
+   "label": "d750",
+   "offered_per_s": 750,
+   "scorer_workers": 4,
+   "threads_per_worker": 1,
+   "completed": 10932,
+   "dropped_iterations": 318,
+   "auth_errors": 0,
+   "p50_ms": 459.4,
+   "p95_ms": 770.4,
+   "p99_ms": 973.0,
+   "rules_fallback": 352,
+   "api_pool": {
+    "samples": 25,
+    "mean_active": 3.5,
+    "mean_idle_in_transaction": 16.2,
+    "mean_idle": 0.3
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 783,
+    "per_container_pct": {
+     "score": 273,
+     "api": 178,
+     "postgres": 108,
+     "kafka": 102,
+     "outbox": 52,
+     "features": 34,
+     "cases-worker": 23,
+     "redis": 12,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  },
+  {
+   "label": "d850",
+   "offered_per_s": 850,
+   "scorer_workers": 4,
+   "threads_per_worker": 1,
+   "completed": 9273,
+   "dropped_iterations": 3477,
+   "auth_errors": 0,
+   "p50_ms": 1259.1,
+   "p95_ms": 1655.5,
+   "p99_ms": 1877.5,
+   "rules_fallback": 702,
+   "api_pool": {
+    "samples": 26,
+    "mean_active": 2.8,
+    "mean_idle_in_transaction": 16.3,
+    "mean_idle": 0.8
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 800,
+    "per_container_pct": {
+     "score": 266,
+     "api": 185,
+     "kafka": 118,
+     "postgres": 113,
+     "outbox": 48,
+     "features": 34,
+     "cases-worker": 23,
+     "redis": 12,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  },
+  {
+   "label": "w6_850",
+   "offered_per_s": 850,
+   "scorer_workers": 6,
+   "threads_per_worker": 1,
+   "completed": 10160,
+   "dropped_iterations": 2591,
+   "auth_errors": 0,
+   "p50_ms": 1142.4,
+   "p95_ms": 1529.3,
+   "p99_ms": 1739.2,
+   "rules_fallback": 528,
+   "api_pool": {
+    "samples": 25,
+    "mean_active": 3.7,
+    "mean_idle_in_transaction": 15.5,
+    "mean_idle": 0.8
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 812,
+    "per_container_pct": {
+     "score": 285,
+     "api": 195,
+     "kafka": 110,
+     "postgres": 104,
+     "outbox": 54,
+     "features": 32,
+     "cases-worker": 21,
+     "redis": 11,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  },
+  {
+   "label": "w8_850",
+   "offered_per_s": 850,
+   "scorer_workers": 8,
+   "threads_per_worker": 1,
+   "completed": 10059,
+   "dropped_iterations": 2692,
+   "auth_errors": 0,
+   "p50_ms": 1073.8,
+   "p95_ms": 1765.5,
+   "p99_ms": 2005.8,
+   "rules_fallback": 647,
+   "api_pool": {
+    "samples": 25,
+    "mean_active": 3.5,
+    "mean_idle_in_transaction": 15.8,
+    "mean_idle": 0.7
+   },
+   "container_cpu": {
+    "snapshots": 6,
+    "total_pct": 792,
+    "per_container_pct": {
+     "score": 286,
+     "api": 189,
+     "kafka": 105,
+     "postgres": 102,
+     "outbox": 49,
+     "features": 30,
+     "cases-worker": 20,
+     "redis": 11,
+     "cases-api": 0,
+     "console": 0
+    }
+   }
+  }
+ ],
+ "host_cpu_at_800": {
+  "run": {
+   "completed": 10948,
+   "dropped_iterations": 1053,
+   "auth_errors": 0,
+   "p50_ms": 781.6,
+   "p95_ms": 1309.0,
+   "p99_ms": 1559.0,
+   "rules_fallback": 414
+  },
+  "top": "macOS top during the run: 0.8% and 1.9% idle; Docker's VM process 546% and 723%; k6 144% and 49%"
+ },
+ "scorer_in_process_ms": {
+  "what": "Median and p99 of 2,000 in-process calls with threads=1, no HTTP, empty card history",
+  "feature_build": [
+   0.003,
+   0.004
+  ],
+  "onnx_run": [
+   0.007,
+   0.009
+  ],
+  "calibration": [
+   0.022,
+   0.026
+  ],
+  "lightgbm_treeshap_reason_codes": [
+   0.556,
+   0.617
+  ],
+  "full_Scorer_score": [
+   0.61,
+   0.696
+  ],
+  "model": "250 trees, 15 features"
+ },
+ "findings": [
+  "600 and 700/s completed every scheduled authorization with no errors, but with a heavy tail (p99 about 400 ms) and about 2.5% rules fallback.",
+  "750/s is the knee: all 20 pooled connections were in use (16 idle in transaction, waiting on the scorer), p50 jumped to 459 ms and k6 dropped 318 iterations. At 850/s throughput fell to about 620 completed per second.",
+  "6 or 8 scorer workers instead of 4 raised 850/s throughput by about 10% only; scorer CPU stayed near 285% regardless.",
+  "The host itself was out of CPU: about 800% of container CPU plus k6, with macOS reporting 1-2% idle at 800/s. The ceiling of roughly 730/s on this laptop is total CPU shared by every service and the load generator, not one component.",
+  "At 750/s the stack spent about 11 ms of CPU per authorization: scorer 3.7 ms, API 2.4 ms, PostgreSQL 1.5 ms, Kafka 1.4 ms, outbox 0.7 ms.",
+  "In process a score costs 0.61 ms, 0.56 ms of it LightGBM TreeSHAP for the reason codes; the scorer container's remaining ~3 ms per request is HTTP, FastAPI/pydantic, thread hand-off and Redis work."
+ ],
+ "next": [
+  "Run the load generator on a separate machine so it does not compete for the CPU it measures.",
+  "Cut per-request scorer overhead: measure an async endpoint with an async Redis client, a leaner JSON path, or batched scoring; TreeSHAP is about 15% of the scorer's CPU and could be computed only for declines or reviews.",
+  "Give Kafka and the outbox a CPU budget check; together they use about 2 ms of CPU per authorization."
+ ],
+ "limits": [
+  "One machine; the samplers add load; single runs per setting.",
+  "Synthetic workload and model; not a production capacity claim."
+ ]
+}
