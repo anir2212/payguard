@@ -251,7 +251,7 @@ components:
         reasons: {type: array, items: {type: string}}
         modelScore: {type: number, format: double, nullable: true, description: Calibrated fraud probability}
         modelAction: {type: string, nullable: true, enum: [OFF, RULES_FALLBACK, SHADOW_DECLINE, SHADOW_APPROVE, MODEL_DECLINE, MODEL_APPROVE]}
-        modelReasonCodes: {type: array, items: {type: string}}
+        modelReasonCodes: {type: array, items: {type: string}, description: "Up to three features that raised the score. Under the packaged default (PAYGUARD_EXPLAIN=declines) the list is filled only when the score reaches the decline threshold, which is also where a case opens; otherwise it is empty."}
         modelVersion: {type: string, nullable: true}
     CardView:
       type: object

@@ -93,6 +93,7 @@ services:
     environment:
       PAYGUARD_REDIS_URL: redis://redis:6379/0
       PAYGUARD_SCORER_THREADS: "${PAYGUARD_SCORER_THREADS:-1}"
+      PAYGUARD_EXPLAIN: "${PAYGUARD_EXPLAIN:-declines}"
     ports: ["127.0.0.1:18086:18086"]
     depends_on:
       redis: {condition: service_healthy}

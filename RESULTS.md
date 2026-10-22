@@ -1,5 +1,28 @@
 # PayGuard measured results
 
+## Reason codes only for declines, 22 October 2026 (evening)
+
+In process, `Scorer.score` took 579 µs per call, and 514 µs of that was LightGBM's TreeSHAP for the reason codes (3,000 calls, one thread). The trees are deep (mean depth 13.5, maximum 22), and TreeSHAP's cost grows with the square of depth. `PAYGUARD_EXPLAIN=declines` skips it unless the score reaches the 0.1 decline threshold, which is also where a case opens. A test checks that scores, decisions and every declined result's codes are identical under both settings. Record: [`bench/explain_ab_2026-10-22.json`](bench/explain_ab_2026-10-22.json).
+
+Each run used a fresh database, the default 4 scorer workers × 1 thread, a 100/s warm-up and a measured 15 seconds of `bench/load_full.js`, with the two settings alternated. CPU here is each container's cumulative cgroup time over the measured window, divided by completed authorizations. It leaves out k6 and Docker's VM, so it reads lower than the docker-stats estimate in the next section; compare it only within this table.
+
+| Offered | Setting | Runs | Stack CPU per authorization | Scorer CPU per authorization | p99 | Dropped |
+|---:|---|---:|---:|---:|---:|---:|
+| 600/s | always | 3 | 8.34 ms (8.17–8.54) | 2.64 ms (2.52–2.66) | 461 ms (368–645) | 31 (14–118) |
+| 600/s | declines | 3 | 7.69 ms (7.55–7.89) | 2.10 ms (2.09–2.15) | 348 ms (281–364) | 0 (0–15) |
+| 750/s | always | 2 | 8.10, 8.63 ms | 2.67, 2.90 ms | 375, 625 ms | 0, 61 |
+| 750/s | declines | 2 | 8.56, 8.87 ms | 2.62, 2.63 ms | 414, 569 ms | 12, 83 |
+
+Medians with ranges at 600/s; both values at 750/s.
+
+- **At 600/s it helps consistently.** All three `declines` runs used less scorer and stack CPU than all three `always` runs: about 0.5 ms less scorer CPU per authorization (20%) and 8% less across the stack.
+- **The saving is limited by this workload.** 57% of its authorizations score at or above 0.1, so TreeSHAP still runs for most of them; only the model's approvals are spared.
+- **At 750/s there was no measurable difference** in two pairs. Near saturation, run-to-run contention is larger than the saving.
+- **The knee is approximate.** One `always` run at 750/s completed every scheduled authorization, which the single 750/s run in the next section did not.
+- **What changes for callers.** Authorizations the model approves now return an empty `modelReasonCodes` list. Model declines and cases keep their codes. `PAYGUARD_EXPLAIN=always` restores codes on every score.
+
+Limits: one machine with k6 on it, three runs per setting at 600/s and two at 750/s, and a synthetic workload and model.
+
 ## Where the scored path saturates, 22 October 2026 (late afternoon)
 
 Same method as the repeated runs below: each run started from a fresh database (its own Compose project and new volumes), with a 100/s warm-up before the measured 15 seconds. The setting was the default 4 scorer workers × 1 thread, with the keep-alive fix. During each run, the API's PostgreSQL connections and the containers' CPU were sampled; the samplers add a little load of their own. These are single runs. Record: [`bench/full_path_limit_2026-10-22.json`](bench/full_path_limit_2026-10-22.json).
@@ -19,7 +42,7 @@ Same method as the repeated runs below: each run started from a fresh database (
 - **Contention, not serving code.** Loaded alone at 500/s, with only Redis running beside it, the scorer container used **1.2 ms** of CPU per request. Serving (HTTP, FastAPI and pydantic, the Redis lookup) therefore adds about 0.6 ms. The 3.7 ms per authorization in the saturated stack is mostly the cost of CPU contention.
 - **httptools and uvloop.** Swapping uvicorn's pure-Python h11 server for the C parser and uvloop cut the scorer-alone cost by 18% in one A/B pair and 6% in the other (1.23 and 1.24 ms against 1.01 and 1.17 ms). That is too small and inconsistent to adopt yet.
 
-Next steps: run the load generator on a separate machine, and lower CPU per authorization across the services. For example, compute TreeSHAP reason codes only where they are shown, which is about half of the scorer's own cost. Limits: one machine, sampling overhead, single runs, and a synthetic workload and model.
+Next steps: run the load generator on a separate machine, and lower CPU per authorization across the services. For example, compute TreeSHAP reason codes only where they are shown, which is about half of the scorer's own cost (done that evening; see the section above). Limits: one machine, sampling overhead, single runs, and a synthetic workload and model.
 
 ## Repeated load runs, the 500/s ceiling and its fix, 22 October 2026 (afternoon)
 
