@@ -1,5 +1,24 @@
 # PayGuard measured results
 
+## Where the scored path saturates, 22 October 2026 (late afternoon)
+
+Same method as the repeated runs below: each run started from a fresh database (its own Compose project and new volumes), with a 100/s warm-up before the measured 15 seconds. The setting was the default 4 scorer workers × 1 thread, with the keep-alive fix. During each run, the API's PostgreSQL connections and the containers' CPU were sampled; the samplers add a little load of their own. These are single runs. Record: [`bench/full_path_limit_2026-10-22.json`](bench/full_path_limit_2026-10-22.json).
+
+| Offered | Completed / dropped | p50 / p95 / p99 | Rules fallback | API pool: idle in transaction / idle | Container CPU (of 1,100%) |
+|---:|---:|---:|---:|---:|---:|
+| 600/s | 9,001 / 0 | 20.7 / 208 / 394 ms | 225 | 12.8 / 4.5 | 732% |
+| 700/s | 10,501 / 0 | 35.6 / 235 / 409 ms | 263 | 14.4 / 2.6 | 740% |
+| 750/s | 10,932 / 318 | 459 / 770 / 973 ms | 352 | 16.2 / 0.3 | 783% |
+| 850/s | 9,273 / 3,477 | 1,259 / 1,656 / 1,878 ms | 702 | 16.3 / 0.8 | 800% |
+
+- **The knee is about 730 authorizations a second.** 600 and 700/s completed every scheduled authorization with no errors, but the tail was heavy (p99 about 400 ms). At 750/s all 20 pooled connections were in use, latency jumped and k6 dropped iterations. At 850/s fewer authorizations completed than at 750.
+- **More scorer workers barely help.** 6 or 8 workers at 850/s raised throughput by about 10%. Scorer CPU stayed near 285% either way.
+- **The laptop runs out of CPU.** At 800/s macOS reported 1–2% idle: Docker's VM used 550–720% and k6 50–145%. All the services and the load generator share the same 11 cores, so the ceiling is total CPU rather than one component. The connections idle in transaction are waiting on a scorer that slows down as the machine fills.
+- **Where the CPU goes.** At 750/s the stack used about 11 ms of CPU per authorization: scorer 3.7 ms, API 2.4, PostgreSQL 1.5, Kafka 1.4, outbox 0.7.
+- **Inside the scorer.** In process, a full score costs 0.61 ms (2,000 calls, one thread). LightGBM's TreeSHAP for the three reason codes is 0.56 ms of that; the ONNX model run is 0.007 ms. The other ~3 ms per request in the container is serving work: HTTP, FastAPI and pydantic, the thread hand-off and the Redis lookup.
+
+Next steps: run the load generator on a separate machine, cut per-request scorer overhead (an async endpoint with an async Redis client, or batching), and compute reason codes only where they are shown. Limits: one machine, sampling overhead, single runs, and a synthetic workload and model.
+
 ## Repeated load runs, the 500/s ceiling and its fix, 22 October 2026 (afternoon)
 
 Every run here started from a fresh, empty database: its own Compose project with new volumes, removed afterwards. The project's usual volumes were not touched. Each run had a 15-second warm-up at 100/s, a 10-second pause, then the measured 15 seconds of `bench/load_full.js`. There were three repeats of every setting and rate, with the order of settings rotated between repeats. Other applications on the Mac were light this time. Record: [`bench/full_path_repeat_2026-10-22.json`](bench/full_path_repeat_2026-10-22.json); raw k6 summaries: [`bench/full_path_repeat_k6/`](bench/full_path_repeat_k6/).
