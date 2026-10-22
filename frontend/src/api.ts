@@ -20,22 +20,37 @@ export type Draft = {
   summary: string; draftSource: string; approvalStatus: string
 }
 
+export type Review = { decision: string; analyst: string; role: string; note: string; reviewed_at: string }
+
 export type CaseDetail = CaseRow & {
   cardHistory: Evidence[]; reasonCodes: string[]; merchantProfile: { risk: number; observedAuths: number }
-  linkedCards: string[]; similarCases: string[]; draft: Draft | null
+  linkedCards: string[]; similarCases: string[]; draft: Draft | null; reviews: Review[]
 }
+
+export type Analyst = { name: string; role: string; permissions: string[]; mode: string }
 
 export type SettlementReport = {
   settlementDate: string; matched: number; missingNetwork: number; missingLedger: number
   amountMismatch: number; duplicate: number
   items: { captureId: string; status: string; expectedMinor?: number; observedMinor?: number }[]
+  journalIntegrity: JournalIntegrityReport
+}
+
+export type JournalIntegrityReport = {
+  settlementDate: string; capturesChecked: number; posted: number; missingJournal: number
+  duplicateJournal: number; wrongCurrencyJournal: number; journalAmountMismatch: number
+  items: { captureId: string; status: string; captureMinor: number; captureCurrency: string
+    journalCount: number; postedMinor: number; postedCurrencies: string[] }[]
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
-    try { detail = (await response.json()).error ?? detail } catch { /* plain-text error */ }
+    try {
+      const body = await response.json()
+      detail = body.error ?? body.detail ?? detail
+    } catch { /* plain-text error */ }
     throw new Error(detail)
   }
   return response.json() as Promise<T>
@@ -43,13 +58,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   events: () => request<AuthEvent[]>('/api/payments/v1/authorizations/recent'),
+  me: () => request<Analyst>('/api/cases/me'),
   cases: () => request<CaseRow[]>('/api/cases/cases'),
   case: (id: string) => request<CaseDetail>(`/api/cases/cases/${encodeURIComponent(id)}`),
   draft: (id: string) => request<Draft>(`/api/cases/cases/${encodeURIComponent(id)}/draft`, { method: 'POST' }),
-  review: (id: string, decision: 'APPROVED' | 'REJECTED', analyst: string, note: string) =>
-    request<{ status: string }>(`/api/cases/cases/${encodeURIComponent(id)}/review`, {
+  // The analyst's identity comes from the server (proxy headers or local mode), never the body.
+  review: (id: string, decision: 'APPROVED' | 'REJECTED', note: string) =>
+    request<{ status: string; analyst: string }>(`/api/cases/cases/${encodeURIComponent(id)}/review`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, analyst, note }),
+      body: JSON.stringify({ decision, note }),
     }),
   sample: async (date: string) => {
     const response = await fetch(`/api/payments/v1/settlements/sample?date=${date}`)

@@ -110,6 +110,10 @@ fun Application.payGuardModule(database: Database = Database()) {
                 call.respondText(withContext(Dispatchers.IO) { settlements.sample(date) },
                     ContentType.parse("text/csv"))
             }
+            get("/settlements/integrity") {
+                val date = LocalDate.parse(requireNotNull(call.request.queryParameters["date"]))
+                call.respond(withContext(Dispatchers.IO) { settlements.journalIntegrity(date) })
+            }
             post("/settlements/reconcile") {
                 val date = LocalDate.parse(requireNotNull(call.request.queryParameters["date"]))
                 val csv = call.receiveText()

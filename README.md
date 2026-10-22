@@ -6,10 +6,12 @@ An authorization places a hold. A later capture posts a balanced transfer. The s
 
 ## What has been checked
 
-- The 15 October local Gradle run passed 13 tests, including PostgreSQL journal and shared company-limit checks.
-- On the intentionally learnable synthetic fraud set, the later held-out LightGBM PR-AUC was 0.9574. A separate model on the OpenML benchmark reached 0.7733 PR-AUC. These datasets have different feature contracts and the values are not transfer results.
-- A guarded case workflow matched 40/40 hand-built template patterns and actions without invented cited IDs. The local model produced 12 accepted drafts; 28 cases used the rules fallback.
-- In a 15-second, **rules-only** load run at 500 offered authorizations per second, 7,501 completed with 6.077 ms p95 and zero authorization errors. Synchronous fraud scoring and event publication were outside that load measurement.
+- **Ledger tests.** The 22 October Gradle run passed 21 tests against real PostgreSQL, including journal, shared company-limit, capture-to-journal integrity and query-plan checks.
+- **Settlement.** A capture-to-journal audit (`GET /v1/settlements/integrity`) finds captures whose journal is missing, duplicated, in the wrong currency or for the wrong amount, including a capture that both the journal and the network file omit. A separately generated synthetic settlement fixture scored 105/105 against labels the reconciler never reads.
+- **Fraud models.** On the intentionally learnable synthetic fraud set, the later held-out LightGBM PR-AUC was 0.9574. A separate model on the OpenML benchmark reached 0.7733 PR-AUC. These datasets have different feature contracts and the values are not transfer results.
+- **Case review.** A guarded case workflow matched 40/40 hand-built template patterns and actions without invented cited IDs; the local model produced 12 accepted drafts and 28 cases used the rules fallback. The case API takes the analyst's identity from the server (proxy headers with a shared token, or one local identity), not from the form. Only a `lead` may record a decision, every decision is kept in an append-only history, and reads, drafts and reviews are audited. A headless-Chrome review passed 10/10 checks, and an optional PostgreSQL case store recorded exactly one of two concurrent reviews.
+- **Full scored path under load.** On 22 October the whole stack ran under a mixed k6 workload with scoring enforced. The first runs held 250 authorizations a second and saturated at 500. Repeated runs on fresh databases traced the 500/s ceiling to a 40 ms pause on every reused connection to a multi-worker scorer, because uvicorn left Nagle's algorithm on. With that fixed, the new default of four scorer workers at one thread each completed all 7,501 scheduled authorizations at 500/s in three of three runs (median p50 6.9 ms, p99 174 ms, under 2% rules fallback). Single runs saturated at 750 and 1,000/s. Two missing indexes whose cost grew with the data were also found and fixed.
+- **Rules-only baseline.** The 11 October rules-only run at 500 offered authorizations per second completed 7,501 with 6.077 ms p95 and zero authorization errors, with scoring and event publication outside the measurement.
 
 The [measured results](RESULTS.md) give hardware, denominators, raw artifacts, and limitations. These checks do not establish live card-network capacity or real-world fraud accuracy.
 
@@ -30,4 +32,4 @@ The [OpenAPI contract](src/main/resources/openapi.yaml) describes the card and p
 
 ## What remains
 
-The next checks are a capture-to-journal integrity audit, settlement cases from a source independent of this ledger, and a load test of the complete fraud-enabled route with queue lag and fallback rates. An authenticated analyst identity and durable shared case store are needed before a user-facing deployment. No real cards, customer data, or network feed are used here.
+The next checks are finding what limits the scored path between 500 and 750 authorizations a second, putting an authenticating proxy and the PostgreSQL case store into the packaged stack, and testing settlement against a network-format file from an independent source. No real cards, customer data, or network feed are used here.

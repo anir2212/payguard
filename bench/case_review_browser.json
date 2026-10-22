@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-10-20T10:44:22+00:00",
+  "what": "Headless Chrome case review through the Vite proxy with proxy-mode identity",
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-15.3.1-arm64-arm-64bit",
+    "chrome": "155.0.8059.85",
+    "playwright": "1.64.0",
+    "fastapi": "0.143.0"
+  },
+  "passed": 10,
+  "total": 10,
+  "servers_stopped": true,
+  "checks": {
+    "no_proxy_headers_shows_401_and_no_cases": true,
+    "analyst_draft_has_citations": true,
+    "every_citation_is_in_case_evidence": true,
+    "analyst_sees_identity_and_disabled_review": true,
+    "no_analyst_name_input": true,
+    "lead_review_recorded_under_server_identity": true,
+    "review_buttons_gone_after_decision": true,
+    "audit_names_drafter_and_reviewer": true,
+    "second_review_refused": true,
+    "analyst_cannot_read_audit": true
+  },
+  "observed": {
+    "citations": [
+      "auth_small_0",
+      "auth_small_1",
+      "auth_small_2",
+      "auth_small_3"
+    ],
+    "evidence": [
+      "auth_small_0",
+      "auth_small_1",
+      "auth_small_2",
+      "auth_small_3"
+    ],
+    "history": "APPROVED by lee (lead) \u00b7 20 Oct 2026, 6:44 pm \u00b7 Customer confirmed card testing",
+    "audit_actions": [
+      [
+        "system:case-stream",
+        "case_opened"
+      ],
+      [
+        "ana",
+        "view_case"
+      ],
+      [
+        "ana",
+        "view_case"
+      ],
+      [
+        "ana",
+        "draft_saved"
+      ],
+      [
+        "ana",
+        "view_case"
+      ],
+      [
+        "lee",
+        "view_case"
+      ],
+      [
+        "lee",
+        "review_recorded"
+      ],
+      [
+        "lee",
+        "view_case"
+      ]
+    ]
+  },
+  "limits": [
+    "Synthetic seeded events in a disposable SQLite store.",
+    "Browser-set headers stand in for an authenticating proxy; no identity provider was used. Draft text came from the rules fallback (Ollama off).",
+    "The payments API was not running; its route returned an empty list."
+  ]
+}

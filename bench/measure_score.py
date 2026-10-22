@@ -44,7 +44,8 @@ def main() -> None:
         one()
     values = [one() for _ in range(count)]
     result = {
-        "description": "Sequential localhost HTTP POST /score, including Redis, ONNX, calibration, and reason codes",
+        "description": ("Sequential localhost HTTP POST /score, including Redis, ONNX, "
+                        "calibration, and reason codes"),
         "requests": count, "p50_ms": round(statistics.median(values), 3),
         "p95_ms": round(percentile(values, 95), 3),
         "p99_ms": round(percentile(values, 99), 3),

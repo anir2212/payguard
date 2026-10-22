@@ -139,9 +139,24 @@ paths:
           content:
             text/csv:
               schema: {type: string}
+  /v1/settlements/integrity:
+    get:
+      summary: Audit capture records on a UTC date against their balanced capture journals
+      description: >-
+        Independent of any network file. Reports captures with no capture journal, more than one,
+        a journal in a currency other than the capture's billing currency, or a merchant-clearing
+        credit that differs from the capture's billed amount. A missing posting is never treated as settled.
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: One item per capture record created on the date
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JournalIntegrityReport'}
   /v1/settlements/reconcile:
     post:
-      summary: Compare a synthetic network CSV against captured ledger amounts
+      summary: Compare a synthetic network CSV against posted merchant-clearing journal amounts
       parameters:
         - {name: date, in: query, required: true, schema: {type: string, format: date}}
       requestBody:
@@ -180,7 +195,7 @@ components:
   schemas:
     SettlementReport:
       type: object
-      required: [settlementDate, matched, missingNetwork, missingLedger, amountMismatch, duplicate, items]
+      required: [settlementDate, matched, missingNetwork, missingLedger, amountMismatch, duplicate, items, journalIntegrity]
       properties:
         settlementDate: {type: string, format: date}
         matched: {type: integer}
@@ -200,6 +215,31 @@ components:
               observedMinor: {type: integer, format: int64, nullable: true}
               expectedCurrency: {type: string, nullable: true}
               observedCurrency: {type: string, nullable: true}
+        journalIntegrity: {$ref: '#/components/schemas/JournalIntegrityReport'}
+    JournalIntegrityReport:
+      type: object
+      required: [settlementDate, capturesChecked, posted, missingJournal, duplicateJournal, wrongCurrencyJournal, journalAmountMismatch, items]
+      properties:
+        settlementDate: {type: string, format: date}
+        capturesChecked: {type: integer}
+        posted: {type: integer}
+        missingJournal: {type: integer}
+        duplicateJournal: {type: integer}
+        wrongCurrencyJournal: {type: integer}
+        journalAmountMismatch: {type: integer}
+        items:
+          type: array
+          items:
+            type: object
+            required: [captureId, status, captureMinor, captureCurrency, journalCount, postedMinor, postedCurrencies]
+            properties:
+              captureId: {type: string}
+              status: {type: string, enum: [JOURNAL_POSTED, MISSING_JOURNAL, DUPLICATE_JOURNAL, WRONG_CURRENCY_JOURNAL, JOURNAL_AMOUNT_MISMATCH]}
+              captureMinor: {type: integer, format: int64, description: Billed amount on the capture record}
+              captureCurrency: {type: string}
+              journalCount: {type: integer}
+              postedMinor: {type: integer, format: int64, description: Merchant-clearing credit in the capture currency, summed over capture journals}
+              postedCurrencies: {type: array, items: {type: string}}
     OperationResult:
       type: object
       required: [status, reference, reasons]

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api, type AuthEvent, type CaseDetail, type CaseRow, type SettlementReport } from './api'
+import { api, type Analyst, type AuthEvent, type CaseDetail, type CaseRow, type SettlementReport } from './api'
 
 type Tab = 'overview' | 'cases' | 'transactions' | 'settlement'
 
@@ -20,7 +20,7 @@ function formatTime(value: string) {
 }
 
 function statusClass(status: string) {
-  return status === 'APPROVED' || status === 'MATCHED' ? 'good' :
+  return status === 'APPROVED' || status === 'MATCHED' || status === 'JOURNAL_POSTED' ? 'good' :
     status === 'OPEN' || status === 'PENDING_ANALYST' ? 'warn' : 'bad'
 }
 
@@ -31,7 +31,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<CaseDetail | null>(null)
   const [filter, setFilter] = useState('')
-  const [analyst, setAnalyst] = useState('local_analyst')
+  const [analyst, setAnalyst] = useState<Analyst | null>(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,6 +39,7 @@ export default function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [csv, setCsv] = useState('')
   const [settlement, setSettlement] = useState<SettlementReport | null>(null)
+  const canReview = analyst?.permissions.includes('review') ?? false
 
   const refresh = useCallback(async () => {
     try {
@@ -48,6 +49,10 @@ export default function App() {
       setLastUpdated(new Date())
       setError('')
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+  }, [])
+
+  useEffect(() => {
+    api.me().then(setAnalyst).catch(() => setAnalyst(null))
   }, [])
 
   useEffect(() => {
@@ -72,10 +77,10 @@ export default function App() {
   }
 
   async function review(decision: 'APPROVED' | 'REJECTED') {
-    if (!selectedId || !analyst.trim()) return
+    if (!selectedId || !canReview) return
     setBusy(true)
     try {
-      await api.review(selectedId, decision, analyst.trim(), note)
+      await api.review(selectedId, decision, note)
       await openCase(selectedId)
       await refresh()
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
@@ -151,14 +156,17 @@ export default function App() {
             <div className="section-title">Model reason codes</div><div className="tags">{detail.reasonCodes.length ? detail.reasonCodes.map(code => <span className="tag" key={code}>{code}</span>) : <span className="muted">No model codes</span>}</div>
             <div className="section-title">Recent evidence</div><div className="evidence-list">{detail.cardHistory.map(row => <button key={row.transactionId} onClick={() => jumpToTransaction(row.transactionId)}><span>{row.transactionId}</span><b>{formatMoney(row.amountMinor)}</b><small>{row.status}</small></button>)}</div>
             {detail.draft ? <div className="draft-box"><div className="draft-head"><div><p className="eyebrow">AGENT DRAFT · {detail.draft.draftSource.toUpperCase()}</p><h3>{detail.draft.pattern.replaceAll('_', ' ')}</h3></div><span className="confidence">{Math.round(detail.draft.confidence * 100)}% confidence</span></div><p>{detail.draft.summary}</p>{detail.draft.claims.map((claim, index) => <div className="claim" key={index}>{claim.text}<div>{claim.citations.map(id => <button key={id} onClick={() => jumpToTransaction(id)}>{id}</button>)}</div></div>)}<div className="recommendation"><span>RECOMMENDED ACTION</span><strong>{detail.draft.recommendedAction.replaceAll('_', ' ')}</strong></div></div> : <button className="primary" disabled={busy} onClick={() => void draftCase()}>Generate cited draft</button>}
-            {detail.draft && detail.status === 'OPEN' && <div className="review-box"><p>Record your review. This console does not execute a freeze or contact the customer.</p><div className="review-inputs"><input aria-label="Analyst" value={analyst} onChange={event => setAnalyst(event.target.value)} placeholder="Analyst name" /><input aria-label="Review note" value={note} onChange={event => setNote(event.target.value)} placeholder="Review note" /></div><div className="review-actions"><button className="primary" disabled={busy || !analyst.trim()} onClick={() => void review('APPROVED')}>Approve recommendation</button><button className="secondary" disabled={busy || !analyst.trim()} onClick={() => void review('REJECTED')}>Reject</button></div></div>}
+            {detail.draft && detail.status === 'OPEN' && <div className="review-box"><p>Record your review. This console does not execute a freeze or contact the customer.</p><p className="muted" aria-label="Signed-in analyst">{analyst ? `Recording as ${analyst.name} (${analyst.role})` : 'Analyst identity unavailable'}</p>{analyst && !canReview && <p className="muted">Your role can draft but cannot record a review; a lead must decide.</p>}<div className="review-inputs"><input aria-label="Review note" value={note} onChange={event => setNote(event.target.value)} placeholder="Review note" /></div><div className="review-actions"><button className="primary" disabled={busy || !canReview} onClick={() => void review('APPROVED')}>Approve recommendation</button><button className="secondary" disabled={busy || !canReview} onClick={() => void review('REJECTED')}>Reject</button></div></div>}
+            {detail.reviews?.length > 0 && <><div className="section-title">Review history</div><ul className="review-history" aria-label="Review history">{detail.reviews.map((row, index) => <li key={index}><strong>{row.decision}</strong> by {row.analyst} ({row.role}) · {formatTime(row.reviewed_at)}{row.note && <> · {row.note}</>}</li>)}</ul></>}
           </> : <div className="empty-state"><span>◎</span><h2>Select a case</h2><p>Open a case from the queue to inspect its evidence and review a draft.</p></div>}</section></div>
       </div>}
 
       {tab === 'transactions' && <div className="content"><div className="page-head"><div><p className="eyebrow">PAYMENT DECISIONS</p><h1>Authorizations</h1><p className="subtle">The latest events committed to the PostgreSQL outbox.</p></div><span className="summary-chip">{events.length} visible</span></div><section className="panel"><div className="table-tools"><h2>Event stream</h2><input className="search" aria-label="Filter authorizations" placeholder="Search auth, card, merchant…" value={filter} onChange={event => setFilter(event.target.value)} /></div><div className="table-wrap"><table><thead><tr><th>TIME</th><th>AUTHORIZATION</th><th>MERCHANT</th><th>AMOUNT</th><th>MODEL SCORE</th><th>DECISION</th></tr></thead><tbody>{visibleEvents.map(event => <tr key={event.request.authId}><td>{formatTime(event.timestamp)}</td><td className="mono">{event.request.authId}</td><td>{event.request.merchantId}</td><td>{formatMoney(event.request.amountMinor, event.request.currency)}</td><td>{event.result.modelScore == null ? '—' : event.result.modelScore.toFixed(3)}</td><td><span className={`pill ${statusClass(event.result.status)}`}>{event.result.status}</span><small className="mode">{event.result.modelAction}</small></td></tr>)}</tbody></table>{!visibleEvents.length && <p className="empty">No matching events.</p>}</div></section></div>}
 
-      {tab === 'settlement' && <div className="content"><div className="page-head"><div><p className="eyebrow">LEDGER CONTROLS</p><h1>Settlement reconciliation</h1><p className="subtle">Compare a synthetic network file with captured billing amounts for a UTC day.</p></div></div><section className="panel settlement-panel"><div className="panel-head"><h2>Network file</h2><div className="settlement-controls"><input type="date" aria-label="Settlement date" value={date} onChange={event => setDate(event.target.value)} /><button className="secondary" disabled={busy} onClick={() => void loadSample()}>Load sample</button><button className="primary" disabled={busy || !csv.trim()} onClick={() => void reconcile()}>Reconcile</button></div></div><p className="hint">CSV header: <code>capture_id,amount_minor,currency</code>. Edit the sample to explore duplicates, missing rows, and mismatches.</p><textarea aria-label="Network settlement CSV" value={csv} onChange={event => setCsv(event.target.value)} placeholder="capture_id,amount_minor,currency" spellCheck={false} />
-          {settlement && <div className="settlement-results"><div className="result-stats"><div><strong>{settlement.matched}</strong><span>MATCHED</span></div><div><strong>{settlement.missingNetwork}</strong><span>MISSING NETWORK</span></div><div><strong>{settlement.missingLedger}</strong><span>MISSING LEDGER</span></div><div><strong>{settlement.amountMismatch}</strong><span>MISMATCH</span></div><div><strong>{settlement.duplicate}</strong><span>DUPLICATE</span></div></div><div className="table-wrap"><table><thead><tr><th>CAPTURE</th><th>STATUS</th><th>LEDGER</th><th>NETWORK</th></tr></thead><tbody>{settlement.items.map((item, index) => <tr key={`${item.captureId}-${index}`}><td className="mono">{item.captureId}</td><td><span className={`pill ${statusClass(item.status)}`}>{item.status}</span></td><td>{formatMoney(item.expectedMinor)}</td><td>{formatMoney(item.observedMinor)}</td></tr>)}</tbody></table></div></div>}
+      {tab === 'settlement' && <div className="content"><div className="page-head"><div><p className="eyebrow">LEDGER CONTROLS</p><h1>Settlement reconciliation</h1><p className="subtle">Compare a synthetic network file with posted merchant-clearing journal amounts for a UTC day, and audit every capture against its journal.</p></div></div><section className="panel settlement-panel"><div className="panel-head"><h2>Network file</h2><div className="settlement-controls"><input type="date" aria-label="Settlement date" value={date} onChange={event => setDate(event.target.value)} /><button className="secondary" disabled={busy} onClick={() => void loadSample()}>Load sample</button><button className="primary" disabled={busy || !csv.trim()} onClick={() => void reconcile()}>Reconcile</button></div></div><p className="hint">CSV header: <code>capture_id,amount_minor,currency</code>. Edit the sample to explore duplicates, missing rows, and mismatches.</p><textarea aria-label="Network settlement CSV" value={csv} onChange={event => setCsv(event.target.value)} placeholder="capture_id,amount_minor,currency" spellCheck={false} />
+          {settlement && <div className="settlement-results"><div className="result-stats"><div><strong>{settlement.matched}</strong><span>MATCHED</span></div><div><strong>{settlement.missingNetwork}</strong><span>MISSING NETWORK</span></div><div><strong>{settlement.missingLedger}</strong><span>MISSING LEDGER</span></div><div><strong>{settlement.amountMismatch}</strong><span>MISMATCH</span></div><div><strong>{settlement.duplicate}</strong><span>DUPLICATE</span></div></div><div className="table-wrap"><table><thead><tr><th>CAPTURE</th><th>STATUS</th><th>LEDGER</th><th>NETWORK</th></tr></thead><tbody>{settlement.items.map((item, index) => <tr key={`${item.captureId}-${index}`}><td className="mono">{item.captureId}</td><td><span className={`pill ${statusClass(item.status)}`}>{item.status}</span></td><td>{formatMoney(item.expectedMinor)}</td><td>{formatMoney(item.observedMinor)}</td></tr>)}</tbody></table></div>
+            <div className="panel-head"><h2>Capture-to-journal audit</h2></div><p className="hint">Checks every capture record on this date against its capture journals, without the network file. A missing posting is never counted as settled.</p><div className="result-stats"><div><strong>{settlement.journalIntegrity.capturesChecked}</strong><span>CAPTURES</span></div><div><strong>{settlement.journalIntegrity.posted}</strong><span>POSTED</span></div><div><strong>{settlement.journalIntegrity.missingJournal}</strong><span>MISSING JOURNAL</span></div><div><strong>{settlement.journalIntegrity.duplicateJournal}</strong><span>DUPLICATE JOURNAL</span></div><div><strong>{settlement.journalIntegrity.wrongCurrencyJournal}</strong><span>WRONG CURRENCY</span></div><div><strong>{settlement.journalIntegrity.journalAmountMismatch}</strong><span>JOURNAL MISMATCH</span></div></div>
+            {settlement.journalIntegrity.items.some(item => item.status !== 'JOURNAL_POSTED') && <div className="table-wrap"><table aria-label="Journal audit discrepancies"><thead><tr><th>CAPTURE</th><th>STATUS</th><th>CAPTURED</th><th>POSTED</th><th>JOURNALS</th></tr></thead><tbody>{settlement.journalIntegrity.items.filter(item => item.status !== 'JOURNAL_POSTED').map(item => <tr key={item.captureId}><td className="mono">{item.captureId}</td><td><span className={`pill ${statusClass(item.status)}`}>{item.status}</span></td><td>{formatMoney(item.captureMinor, item.captureCurrency)}</td><td>{formatMoney(item.postedMinor, item.captureCurrency)}</td><td>{item.journalCount}{item.postedCurrencies.length ? ` (${item.postedCurrencies.join(', ')})` : ''}</td></tr>)}</tbody></table></div>}</div>}
         </section></div>}
     </main>
   </div>

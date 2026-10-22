@@ -1,0 +1,118 @@
+{
+  "what": "Follow-up to bench/full_path_load_2026-10-22.json: scorer worker and thread settings, and two database scalability fixes found while load testing",
+  "date": "2026-10-22",
+  "workload": "bench/load_full.js, unchanged",
+  "scorer_settings_indicative": {
+    "note": "Single runs, measured after the first batch while the database was growing (see the database findings below). The direction is consistent, but the numbers are not as clean as the first batch.",
+    "runs": [
+      {
+        "label": "enforce_warm_250",
+        "setting": "1 worker, default threads (first batch, for reference)",
+        "offered_per_s": 250,
+        "completed": 3751,
+        "dropped_iterations": 0,
+        "auth_errors": 0,
+        "p50_ms": 16.155,
+        "p95_ms": 52.544,
+        "p99_ms": 69.017,
+        "rules_fallback": 114
+      },
+      {
+        "label": "enforce_w4_warm_250",
+        "setting": "4 workers, default threads",
+        "offered_per_s": 250,
+        "completed": 3751,
+        "dropped_iterations": 0,
+        "auth_errors": 0,
+        "p50_ms": 51.436,
+        "p95_ms": 88.852,
+        "p99_ms": 216.535,
+        "rules_fallback": 50
+      },
+      {
+        "label": "enforce_w4t1_warm_250",
+        "setting": "4 workers, 1 thread each (PAYGUARD_SCORER_THREADS=1)",
+        "offered_per_s": 250,
+        "completed": 3751,
+        "dropped_iterations": 0,
+        "auth_errors": 0,
+        "p50_ms": 3.79,
+        "p95_ms": 44.488,
+        "p99_ms": 59.286,
+        "rules_fallback": 10
+      },
+      {
+        "label": "enforce_warm_500",
+        "setting": "1 worker, default threads (first batch, for reference)",
+        "offered_per_s": 500,
+        "completed": 5798,
+        "dropped_iterations": 1703,
+        "auth_errors": 0,
+        "p50_ms": 1253.81,
+        "p95_ms": 1653.127,
+        "p99_ms": 1944.0,
+        "rules_fallback": 4005
+      },
+      {
+        "label": "enforce_w4_warm_500",
+        "setting": "4 workers, default threads",
+        "offered_per_s": 500,
+        "completed": 5217,
+        "dropped_iterations": 2283,
+        "auth_errors": 0,
+        "p50_ms": 1424.326,
+        "p95_ms": 1869.778,
+        "p99_ms": 2220.071,
+        "rules_fallback": 167
+      },
+      {
+        "label": "enforce_w4_warm_500_b",
+        "setting": "4 workers, default threads, repeat",
+        "offered_per_s": 500,
+        "completed": 5152,
+        "dropped_iterations": 2349,
+        "auth_errors": 0,
+        "p50_ms": 1438.798,
+        "p95_ms": 1960.76,
+        "p99_ms": 2325.436,
+        "rules_fallback": 125
+      },
+      {
+        "label": "enforce_w4t1_warm_500",
+        "setting": "4 workers, 1 thread each",
+        "offered_per_s": 500,
+        "completed": 6525,
+        "dropped_iterations": 976,
+        "auth_errors": 0,
+        "p50_ms": 1057.781,
+        "p95_ms": 1482.113,
+        "p99_ms": 1822.139,
+        "rules_fallback": 12
+      }
+    ],
+    "cpu_observation": "During a 500/s run with 4 workers and default threads the scorer container peaked at 807% CPU (about 8 cores) while the API stayed under 45%: each request's ONNX Runtime and LightGBM calls used one thread per core, so extra workers oversubscribed the 11-CPU Docker VM."
+  },
+  "database_findings": {
+    "outbox_poll": {
+      "problem": "The publisher's pending-rows query (every 100 ms when idle, continuously under load) had no matching index and scanned the whole outbox.",
+      "before": "Seq Scan over 83,041 rows, 48 ms per poll",
+      "fix": "V3__outbox_pending_index.sql: partial index on (created_at, id) WHERE published_at IS NULL AND discarded_at IS NULL",
+      "after": "Index Scan on outbox_pending_idx, 0.04 ms per poll"
+    },
+    "journal_balance_trigger": {
+      "problem": "The deferred trigger that checks every journal balances at commit sums postings by journal_id, which had no index, so each check scanned all postings.",
+      "before": "Seq Scan over about 184,000 postings, 6.8-29.7 ms per check (3 runs); 200 card issues took 10.5 s",
+      "fix": "V4__postings_journal_index.sql: index on postings(journal_id)",
+      "after": "Bitmap Index Scan on postings_journal_idx, 0.13-0.40 ms per check; 200 card issues took 4.2 s (busy host, indicative)"
+    }
+  },
+  "not_adopted": {
+    "change": "Calling the scorer before opening the authorization transaction, so the scorer wait does not hold a pooled connection and the card-row lock.",
+    "why_not": "An interleaved A/B (in-transaction vs before-transaction, 250/s) was confounded: both variants degraded together because of database growth and host CPU contention (host load average 9-25 from other applications). No clean benefit was shown, so the core payment path was left unchanged. A test showing the lock is held during scoring on the current code (row-lock NOWAIT failure) was written and then removed with the change."
+  },
+  "host_conditions": "Later runs shared the Mac with other busy applications (VS Code renderer about 100% CPU, load average up to 24.7), so latency after the first batch is not comparable with it.",
+  "limits": [
+    "Single runs; no repeated trials except one 500/s repeat.",
+    "Synthetic workload and model on one machine."
+  ]
+}

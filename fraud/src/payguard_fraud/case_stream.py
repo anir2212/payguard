@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 
 from confluent_kafka import Consumer
 
@@ -12,7 +11,7 @@ from payguard_fraud.case_store import CaseStore
 
 
 def main() -> None:
-    store = CaseStore(Path(os.getenv("PAYGUARD_CASE_DB", "data/cases.sqlite")))
+    store = CaseStore.from_env()
     consumer = Consumer({
         "bootstrap.servers": os.getenv("PAYGUARD_KAFKA_BROKERS", "127.0.0.1:19094"),
         "group.id": "payguard-cases-v1", "enable.auto.commit": False,

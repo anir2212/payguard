@@ -72,11 +72,21 @@ class FeatureStore:
 
 
 class Scorer:
-    def __init__(self, artifacts: Path, store: FeatureStore):
+    def __init__(self, artifacts: Path, store: FeatureStore, threads: int = 0):
+        """threads > 0 caps ONNX Runtime and LightGBM to that many threads per request.
+
+        The default (0) lets both libraries use every core, which is fastest for one
+        process but oversubscribes the CPU when several worker processes run.
+        """
         self.store = store
+        self.threads = threads
         self.model = joblib.load(artifacts / "lightgbm_model.joblib")
         self.calibration = joblib.load(artifacts / "lightgbm_calibration.joblib")
-        self.session = ort.InferenceSession(str(artifacts / "lightgbm.onnx"),
+        options = ort.SessionOptions()
+        if threads > 0:
+            options.intra_op_num_threads = threads
+            options.inter_op_num_threads = 1
+        self.session = ort.InferenceSession(str(artifacts / "lightgbm.onnx"), options,
                                             providers=["CPUExecutionProvider"])
         self.threshold = json.loads((artifacts / "synthetic_results.json").read_text())[
             "lightgbm"]["cost_threshold"]
@@ -89,7 +99,8 @@ class Scorer:
         output = self.session.run(None, {self.session.get_inputs()[0].name: vector})
         raw = float(np.asarray(output[1])[0, 1])
         probability = float(self.calibration.predict([raw])[0])
-        contributions = self.model.booster_.predict(vector, pred_contrib=True)[0][:-1]
+        extra = {"num_threads": self.threads} if self.threads > 0 else {}
+        contributions = self.model.booster_.predict(vector, pred_contrib=True, **extra)[0][:-1]
         positive = sorted(((FEATURES[i], float(value)) for i, value in enumerate(contributions)
                            if value > 0), key=lambda pair: pair[1], reverse=True)
         return {
@@ -106,7 +117,8 @@ def scorer() -> Scorer:
     artifacts = Path(os.getenv("PAYGUARD_MODEL_DIR", "artifacts"))
     client = redis.Redis.from_url(os.getenv("PAYGUARD_REDIS_URL", "redis://127.0.0.1:16379/0"),
                                   socket_connect_timeout=0.02, socket_timeout=0.02)
-    return Scorer(artifacts, FeatureStore(client))
+    return Scorer(artifacts, FeatureStore(client),
+                  threads=int(os.getenv("PAYGUARD_SCORER_THREADS", "0")))
 
 
 app = FastAPI(title="PayGuard local fraud scoring")
