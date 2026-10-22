@@ -15,9 +15,11 @@ Same method as the repeated runs below: each run started from a fresh database (
 - **More scorer workers barely help.** 6 or 8 workers at 850/s raised throughput by about 10%. Scorer CPU stayed near 285% either way.
 - **The laptop runs out of CPU.** At 800/s macOS reported 1–2% idle: Docker's VM used 550–720% and k6 50–145%. All the services and the load generator share the same 11 cores, so the ceiling is total CPU rather than one component. The connections idle in transaction are waiting on a scorer that slows down as the machine fills.
 - **Where the CPU goes.** At 750/s the stack used about 11 ms of CPU per authorization: scorer 3.7 ms, API 2.4, PostgreSQL 1.5, Kafka 1.4, outbox 0.7.
-- **Inside the scorer.** In process, a full score costs 0.61 ms (2,000 calls, one thread). LightGBM's TreeSHAP for the three reason codes is 0.56 ms of that; the ONNX model run is 0.007 ms. The other ~3 ms per request in the container is serving work: HTTP, FastAPI and pydantic, the thread hand-off and the Redis lookup.
+- **Inside the scorer.** In process, a full score costs 0.61 ms (2,000 calls, one thread). LightGBM's TreeSHAP for the three reason codes is 0.56 ms of that; the ONNX model run is 0.007 ms.
+- **Contention, not serving code.** Loaded alone at 500/s, with only Redis running beside it, the scorer container used **1.2 ms** of CPU per request. Serving (HTTP, FastAPI and pydantic, the Redis lookup) therefore adds about 0.6 ms. The 3.7 ms per authorization in the saturated stack is mostly the cost of CPU contention.
+- **httptools and uvloop.** Swapping uvicorn's pure-Python h11 server for the C parser and uvloop cut the scorer-alone cost by 18% in one A/B pair and 6% in the other (1.23 and 1.24 ms against 1.01 and 1.17 ms). That is too small and inconsistent to adopt yet.
 
-Next steps: run the load generator on a separate machine, cut per-request scorer overhead (an async endpoint with an async Redis client, or batching), and compute reason codes only where they are shown. Limits: one machine, sampling overhead, single runs, and a synthetic workload and model.
+Next steps: run the load generator on a separate machine, and lower CPU per authorization across the services. For example, compute TreeSHAP reason codes only where they are shown, which is about half of the scorer's own cost. Limits: one machine, sampling overhead, single runs, and a synthetic workload and model.
 
 ## Repeated load runs, the 500/s ceiling and its fix, 22 October 2026 (afternoon)
 
