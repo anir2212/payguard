@@ -16,6 +16,9 @@ import com.payguard.service.PaymentService
 import com.payguard.service.SettlementService
 import com.payguard.service.FraudScorer
 import com.payguard.service.FraudAssessment
+import com.payguard.service.OutboxPublisher
+import org.apache.kafka.clients.producer.MockProducer
+import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -184,6 +187,58 @@ class PaymentIntegrationTest {
                 assertTrue("postings_journal_idx" in plan, plan)
             }
         }
+    }
+
+    private fun insertOutboxRows(topic: String, count: Int): List<UUID> = database.transaction { connection ->
+        (0 until count).map { index ->
+            val id = UUID.randomUUID()
+            connection.prepareStatement(
+                """INSERT INTO outbox(id,topic,event_key,payload,created_at)
+                   VALUES (?,?,?,?::jsonb, now() - make_interval(secs => ?))"""
+            ).use {
+                it.setObject(1, id)
+                it.setString(2, topic)
+                it.setString(3, "card_$index")
+                it.setString(4, """{"n": $index}""")
+                it.setInt(5, 3600 - index)
+                it.executeUpdate()
+            }
+            id
+        }
+    }
+
+    private fun unpublished(ids: List<UUID>): Int = database.transaction { connection ->
+        connection.prepareStatement("SELECT count(*) FROM outbox WHERE id = ANY(?) AND published_at IS NULL").use {
+            it.setArray(1, connection.createArrayOf("uuid", ids.toTypedArray()))
+            it.executeQuery().use { result -> result.next(); result.getInt(1) }
+        }
+    }
+
+    @Test
+    fun outboxPublisherSendsABatchInOrderAndMarksItPublished() {
+        val topic = "test.outbox.${UUID.randomUUID()}"
+        val ids = insertOutboxRows(topic, 5)
+        val producer = MockProducer(true, StringSerializer(), StringSerializer())
+        val publisher = OutboxPublisher(database, producer)
+        while (publisher.publishOnce() > 0) Unit
+        val sent = producer.history().filter { it.topic() == topic }
+        assertEquals((0 until 5).map { """{"n": $it}""" }, sent.map { it.value() })
+        assertEquals((0 until 5).map { "card_$it" }, sent.map { it.key() })
+        assertEquals(0, unpublished(ids))
+    }
+
+    @Test
+    fun outboxRowsStayPendingWhenASendFails() {
+        val drain = OutboxPublisher(database, MockProducer(true, StringSerializer(), StringSerializer()))
+        while (drain.publishOnce() > 0) Unit
+        val ids = insertOutboxRows("test.outbox.${UUID.randomUUID()}", 3)
+        val failing = object : MockProducer<String, String>(false, StringSerializer(), StringSerializer()) {
+            override fun flush() {
+                while (errorNext(RuntimeException("broker unavailable"))) Unit
+            }
+        }
+        assertThrows(Exception::class.java) { OutboxPublisher(database, failing).publishOnce() }
+        assertEquals(3, unpublished(ids))
     }
 
     @Test

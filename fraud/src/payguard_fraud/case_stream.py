@@ -9,6 +9,8 @@ from confluent_kafka import Consumer
 
 from payguard_fraud.case_store import CaseStore
 
+BATCH = 500
+
 
 def main() -> None:
     store = CaseStore.from_env()
@@ -20,13 +22,15 @@ def main() -> None:
     consumer.subscribe(["payguard.authorization"])
     try:
         while True:
-            message = consumer.poll(1.0)
-            if message is None:
-                continue
-            if message.error():
-                raise RuntimeError(str(message.error()))
-            store.observe(json.loads(message.value()))
-            consumer.commit(message=message, asynchronous=False)
+            # One synchronous commit per batch, after every message in it is stored.
+            # A crash mid-batch replays the batch; observe() ignores repeated auth IDs.
+            messages = consumer.consume(num_messages=BATCH, timeout=1.0)
+            for message in messages:
+                if message.error():
+                    raise RuntimeError(str(message.error()))
+                store.observe(json.loads(message.value()))
+            if messages:
+                consumer.commit(asynchronous=False)
     finally:
         consumer.close()
 

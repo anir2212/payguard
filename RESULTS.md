@@ -1,5 +1,27 @@
 # PayGuard measured results
 
+## Batched Kafka publishing and offset commits, 22 October 2026 (evening)
+
+Kafka was the third-largest CPU user per authorization (about 1.4 ms). The outbox publisher waited for each record's acknowledgement and ran one UPDATE per row, and both Python consumers made a synchronous offset commit after every message. That is three broker round trips per authorization before any fetches. Now the publisher sends a whole polled batch (up to 100 rows), flushes once, checks every acknowledgement and marks the rows with one `UPDATE … WHERE id = ANY(?)`. The consumers take up to 500 messages per `consume()` call and commit once after the whole batch is applied. Record: [`bench/kafka_batching_2026-10-22.json`](bench/kafka_batching_2026-10-22.json).
+
+Same method as the section below, at 600/s with `PAYGUARD_EXPLAIN=declines` in both builds. The old images were built from the previous version of the code, and builds alternated (old, batched, batched, old, old, batched). Medians of three runs, with ranges:
+
+| CPU per authorization | Before | Batched |
+|---|---:|---:|
+| Kafka broker | 1.45 ms (1.38–1.49) | 0.53 ms (0.39–0.59) |
+| Outbox publisher | 0.67 ms (0.61–0.69) | 0.35 ms (0.27–0.40) |
+| Feature consumer | 0.53 ms (0.51–0.53) | 0.19 ms (0.17–0.21) |
+| Case consumer | 0.42 ms (0.36–0.43) | 0.34 ms (0.32–0.34) |
+| Whole stack | 8.21 ms (7.71–8.47) | 6.34 ms (5.34–7.17) |
+
+- **Kafka's CPU fell by about 60%,** and every batched run was below every old run. The stack total fell by about 23%; the highest batched run is still below the lowest old one.
+- **The case consumer barely changed,** because each event still costs a write to its SQLite store.
+- **Other services did not move consistently.** The API, PostgreSQL and the scorer vary more between runs (the scorer 1.85–2.42 ms) than any effect here.
+- **Delivery is still at least once.** Rows are marked published only after every record in the batch is acknowledged, and a failed send rolls the batch back for a later retry. Consumers commit only after the whole batch is applied, so a crash replays at most one batch, and both stores already ignore repeated authorization IDs. New tests cover each of these: two Testcontainers tests for the publisher and four for the consumers.
+- All batched runs completed 9,000 or 9,001 of 9,001 authorizations with no errors.
+
+Limits: one machine with k6 on it, three runs per build at a single rate (the knee was not re-measured), and a synthetic workload. A shared lock kept the other heavy jobs on the laptop paused during these runs, but light work may still have run.
+
 ## Reason codes only for declines, 22 October 2026 (evening)
 
 In process, `Scorer.score` took 579 µs per call, and 514 µs of that was LightGBM's TreeSHAP for the reason codes (3,000 calls, one thread). The trees are deep (mean depth 13.5, maximum 22), and TreeSHAP's cost grows with the square of depth. `PAYGUARD_EXPLAIN=declines` skips it unless the score reaches the 0.1 decline threshold, which is also where a case opens. A test checks that scores, decisions and every declined result's codes are identical under both settings. Record: [`bench/explain_ab_2026-10-22.json`](bench/explain_ab_2026-10-22.json).
