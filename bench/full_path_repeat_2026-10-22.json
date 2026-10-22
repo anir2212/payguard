@@ -1,0 +1,1276 @@
+{
+ "what": "Repeated full-path load runs on fresh databases to choose scorer defaults, the diagnosis of the 500/s ceiling, and the same runs after the fix",
+ "date": "2026-10-22",
+ "follows": [
+  "bench/full_path_load_2026-10-22.json",
+  "bench/full_path_followup_2026-10-22.json"
+ ],
+ "hardware": "Apple M3 Pro, 18 GiB memory, macOS 15.3.1; Docker Desktop with 11 CPUs and 11.67 GiB for the VM",
+ "k6": "v2.3.0 (official macos-arm64 release, checksum verified), run natively against 127.0.0.1:8086",
+ "workload": "bench/load_full.js, unchanged",
+ "method": {
+  "fresh_database": "Every measured run used its own Compose project (payguard_bench) brought up from new, empty volumes and torn down with its volumes afterwards. The project's everyday volumes were not touched.",
+  "per_run_sequence": "Start the stack with the setting under test; for the no-index setting drop outbox_pending_idx and postings_journal_idx after Flyway has run; record the index count and scorer process count; run a 15 s warm-up at 100/s; wait 10 s; run the measured 15 s at the offered rate.",
+  "repeats": "Three repeats of every setting and rate. The order of settings was rotated between repeats so slow drift on the host does not favour one setting.",
+  "host": "Other applications were light during these runs (the busiest non-Docker process used about 40% of one core). The recorded load average includes each run's own card setup, which is why it reads 5-17.",
+  "images": "payguard-api, payguard-score and payguard-console built from commit c11b991 for the first batch; payguard-score rebuilt with fraud/src/payguard_fraud/nodelay.py and the --http flag for the second batch."
+ },
+ "diagnosis": {
+  "summary": "Before the fix, 500/s saturated with 4, 6 or 8 single-thread scorer workers alike (about 430 completed per second), although the scorer rarely missed its 50 ms deadline (at most 71 fallbacks in a run of about 5,900 authorizations). Sampling pg_stat_activity during a 4x1 500/s run showed all 20 of the API's pooled connections checked out, about 19 of them idle in transaction: the API was holding each connection while it waited on the scorer. With the model off the same load left the pool almost idle. Calling the scorer directly at 500/s gave p50 2 ms, so the scorer itself was not slow. A Java HttpClient probe from a container on the same network, with the API's settings, took 44-49 ms per call even with one thread on an idle stack, and the same for a Python client inside the scorer container over loopback, on GET /health as well as POST /score. A new connection per request took 1.4 ms; only keep-alive connections stalled. With --workers 1 a keep-alive call took 1.3 ms, with --workers 2 it took 48 ms.",
+  "cause": "With --workers above 1, uvicorn 0.54 binds the listening socket itself with socket.socket(family=AF_INET), protocol number 0. asyncio sets TCP_NODELAY on accepted sockets only when sock.proto == IPPROTO_TCP, so every worker connection kept Nagle's algorithm on. uvicorn's h11 protocol writes response headers and body separately; on a keep-alive connection the body waited for the client's delayed ACK, about 40 ms on Linux. Twenty pooled connections at about 46 ms each cap the API near 20 / 0.046 = 435 authorizations a second, which matches what was measured. k6 on the Mac did not see the stall because Docker Desktop's port forwarder acknowledges immediately.",
+  "fix": "fraud/src/payguard_fraud/nodelay.py subclasses uvicorn's H11Protocol and sets TCP_NODELAY in connection_made; compose.yaml starts the scorer with --http payguard_fraud.nodelay:NoDelayH11Protocol. After the rebuild a keep-alive call took 1.3 ms with 4 workers, and the Java probe went from 48.9 ms to 1.5 ms per call with one thread and from 444 to 1,698 calls/s with 20 threads.",
+  "java_probe": {
+   "before_fix_1_thread": "p50 48.9 ms, 21 calls/s",
+   "before_fix_20_threads": "p50 43.8 ms, 444 calls/s, 40 timeouts",
+   "before_fix_http_1_1_forced": "p50 43.1 ms with 20 threads (HTTP version was not the cause)",
+   "after_fix_1_thread": "p50 1.5 ms, 622 calls/s",
+   "after_fix_20_threads": "p50 10.2 ms, 1,698 calls/s, 128 timeouts"
+  },
+  "earlier_reading_corrected": "The 22 October follow-up said 500/s still saturated with 4x1, 'so the scorer is no longer the only limit'. The limit was this scorer-side stall, multiplied by the API holding a pooled connection while it waits. The first batch's 1-worker runs did not have the stall (single-worker uvicorn sets TCP_NODELAY); there the single process was CPU-bound.",
+  "sampled_500_runs": {
+   "w4t1_500": {
+    "completed": 6516,
+    "dropped_iterations": 985,
+    "auth_errors": 0,
+    "p50_ms": 1081.839,
+    "p95_ms": 1434.926,
+    "p99_ms": 1736.582,
+    "max_ms": 2532.9,
+    "approved": 2745,
+    "declined": 3771,
+    "rules_fallback": 0,
+    "postgres_api_connections": {
+     "samples": 32,
+     "mean_active": 1.2,
+     "mean_idle_in_transaction": 18.8,
+     "mean_idle": 0.0
+    }
+   },
+   "off_500": {
+    "completed": 7500,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 1.448,
+    "p95_ms": 3.872,
+    "p99_ms": 6.14,
+    "max_ms": 27.8,
+    "approved": 7500,
+    "declined": 0,
+    "rules_fallback": 0,
+    "postgres_api_connections": {
+     "samples": 33,
+     "mean_active": 0.4,
+     "mean_idle_in_transaction": 0.2,
+     "mean_idle": 5.3
+    }
+   },
+   "w6t1_500": {
+    "completed": 6454,
+    "dropped_iterations": 1047,
+    "auth_errors": 0,
+    "p50_ms": 1090.889,
+    "p95_ms": 1452.016,
+    "p99_ms": 1710.847,
+    "max_ms": 2502.7,
+    "approved": 2721,
+    "declined": 3733,
+    "rules_fallback": 2,
+    "postgres_api_connections": {
+     "samples": 31,
+     "mean_active": 1.4,
+     "mean_idle_in_transaction": 18.5,
+     "mean_idle": 0.1
+    }
+   },
+   "w8t1_500": {
+    "completed": 6449,
+    "dropped_iterations": 1052,
+    "auth_errors": 0,
+    "p50_ms": 1092.343,
+    "p95_ms": 1506.21,
+    "p99_ms": 1763.94,
+    "max_ms": 3156.2,
+    "approved": 2723,
+    "declined": 3726,
+    "rules_fallback": 4,
+    "postgres_api_connections": {
+     "samples": 30,
+     "mean_active": 2.5,
+     "mean_idle_in_transaction": 17.5,
+     "mean_idle": 0.1
+    }
+   }
+  },
+  "scorer_called_directly_500_per_s": {
+   "workers_1": {
+    "threads_per_worker": 0,
+    "completed": 7362,
+    "dropped_iterations": 139,
+    "p50_ms": 103.3,
+    "p95_ms": 306.6,
+    "p99_ms": 349.9,
+    "over_50_ms": 5301
+   },
+   "workers_4": {
+    "threads_per_worker": 1,
+    "completed": 7500,
+    "dropped_iterations": 0,
+    "p50_ms": 2.0,
+    "p95_ms": 36.0,
+    "p99_ms": 191.8,
+    "over_50_ms": 320
+   },
+   "workers_8": {
+    "threads_per_worker": 1,
+    "completed": 7501,
+    "dropped_iterations": 0,
+    "p50_ms": 1.9,
+    "p95_ms": 3.1,
+    "p99_ms": 15.9,
+    "over_50_ms": 18
+   }
+  }
+ },
+ "limits": [
+  "Synthetic workload and synthetic model on one machine over Docker networking; not a production capacity claim.",
+  "15-second runs on fresh databases do not exercise table growth, so they cannot show the effect of the V3/V4 indexes; that evidence stays in bench/full_path_followup_2026-10-22.json.",
+  "Three repeats per cell; medians and ranges are reported, no confidence intervals.",
+  "The 750/s and 1,000/s runs are single exploratory runs."
+ ],
+ "decision": "compose.yaml now defaults to 4 scorer workers with 1 thread each (PAYGUARD_SCORE_WORKERS=4, PAYGUARD_SCORER_THREADS=1) and always starts the scorer with the TCP_NODELAY protocol. With the fix, 4x1 completed all 7,501 scheduled authorizations at 500/s in each of three runs (median p50 6.9 ms, p99 174 ms, 22-132 rules fallbacks), while 1 worker still saturated. Both variables can still be overridden.",
+ "next_limit": "Single exploratory runs with 4x1 saturated at 750/s (about 680 completed per second, 1,017 dropped, 5% fallback) and at 1,000/s. Because fallback stayed low, the scorer deadline is not the main limit there; the API's 20-connection pool held during the scorer call, scorer CPU and PostgreSQL commit cost are the candidates. Not yet diagnosed.",
+ "before_fix": {
+  "rows": [
+   {
+    "label": "w1_idx_250_r1",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "6.79",
+     "14.13",
+     "32.95"
+    ],
+    "finished_utc": "2026-10-22T01:48:02Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 22.972,
+    "p95_ms": 81.977,
+    "p99_ms": 138.416,
+    "max_ms": 384.0,
+    "approved": 1766,
+    "declined": 1985,
+    "rules_fallback": 379
+   },
+   {
+    "label": "w1_idx_250_r2",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "17.16",
+     "11.60",
+     "23.81"
+    ],
+    "finished_utc": "2026-10-22T01:55:06Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 58.035,
+    "p95_ms": 162.164,
+    "p99_ms": 291.084,
+    "max_ms": 527.3,
+    "approved": 2872,
+    "declined": 879,
+    "rules_fallback": 2245
+   },
+   {
+    "label": "w1_idx_250_r3",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "7.36",
+     "8.30",
+     "15.40"
+    ],
+    "finished_utc": "2026-10-22T02:06:06Z",
+    "completed": 3750,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 23.77,
+    "p95_ms": 60.642,
+    "p99_ms": 94.918,
+    "max_ms": 227.2,
+    "approved": 1683,
+    "declined": 2067,
+    "rules_fallback": 184
+   },
+   {
+    "label": "w1_idx_500_r1",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "8.18",
+     "10.38",
+     "26.42"
+    ],
+    "finished_utc": "2026-10-22T01:52:22Z",
+    "completed": 5572,
+    "dropped_iterations": 1928,
+    "auth_errors": 0,
+    "p50_ms": 1297.218,
+    "p95_ms": 1708.433,
+    "p99_ms": 1992.397,
+    "max_ms": 2885.5,
+    "approved": 4757,
+    "declined": 815,
+    "rules_fallback": 4251
+   },
+   {
+    "label": "w1_idx_500_r2",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "8.04",
+     "10.19",
+     "20.37"
+    ],
+    "finished_utc": "2026-10-22T01:59:12Z",
+    "completed": 5483,
+    "dropped_iterations": 2017,
+    "auth_errors": 0,
+    "p50_ms": 1313.172,
+    "p95_ms": 1742.999,
+    "p99_ms": 2032.763,
+    "max_ms": 2960.2,
+    "approved": 4938,
+    "declined": 545,
+    "rules_fallback": 4560
+   },
+   {
+    "label": "w1_idx_500_r3",
+    "setting": "w1_idx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "8.50",
+     "8.35",
+     "13.53"
+    ],
+    "finished_utc": "2026-10-22T02:10:36Z",
+    "completed": 5591,
+    "dropped_iterations": 1910,
+    "auth_errors": 0,
+    "p50_ms": 1302.905,
+    "p95_ms": 1715.17,
+    "p99_ms": 2036.404,
+    "max_ms": 2821.6,
+    "approved": 5168,
+    "declined": 423,
+    "rules_fallback": 4839
+   },
+   {
+    "label": "w1_noidx_250_r1",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 250,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "4.95",
+     "16.00",
+     "35.29"
+    ],
+    "finished_utc": "2026-10-22T01:46:47Z",
+    "completed": 3750,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 24.988,
+    "p95_ms": 132.246,
+    "p99_ms": 215.479,
+    "max_ms": 479.9,
+    "approved": 1908,
+    "declined": 1842,
+    "rules_fallback": 622
+   },
+   {
+    "label": "w1_noidx_250_r2",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 250,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "9.10",
+     "10.87",
+     "21.59"
+    ],
+    "finished_utc": "2026-10-22T01:57:40Z",
+    "completed": 3750,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 37.641,
+    "p95_ms": 85.878,
+    "p99_ms": 144.998,
+    "max_ms": 451.2,
+    "approved": 2120,
+    "declined": 1630,
+    "rules_fallback": 996
+   },
+   {
+    "label": "w1_noidx_250_r3",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 250,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "7.92",
+     "8.57",
+     "16.13"
+    ],
+    "finished_utc": "2026-10-22T02:04:51Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 23.096,
+    "p95_ms": 60.631,
+    "p99_ms": 86.36,
+    "max_ms": 313.3,
+    "approved": 1702,
+    "declined": 2049,
+    "rules_fallback": 222
+   },
+   {
+    "label": "w1_noidx_500_r1",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 500,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "6.51",
+     "10.96",
+     "28.60"
+    ],
+    "finished_utc": "2026-10-22T01:50:54Z",
+    "completed": 5237,
+    "dropped_iterations": 2263,
+    "auth_errors": 0,
+    "p50_ms": 1380.636,
+    "p95_ms": 1840.523,
+    "p99_ms": 2170.162,
+    "max_ms": 2905.4,
+    "approved": 5003,
+    "declined": 234,
+    "rules_fallback": 4840
+   },
+   {
+    "label": "w1_noidx_500_r2",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 500,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "7.44",
+     "9.34",
+     "18.11"
+    ],
+    "finished_utc": "2026-10-22T02:02:19Z",
+    "completed": 5426,
+    "dropped_iterations": 2075,
+    "auth_errors": 0,
+    "p50_ms": 1346.142,
+    "p95_ms": 1773.633,
+    "p99_ms": 2088.691,
+    "max_ms": 2918.4,
+    "approved": 5096,
+    "declined": 330,
+    "rules_fallback": 4884
+   },
+   {
+    "label": "w1_noidx_500_r3",
+    "setting": "w1_noidx",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": false,
+    "offered_per_s": 500,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "10.57",
+     "8.41",
+     "14.13"
+    ],
+    "finished_utc": "2026-10-22T02:09:08Z",
+    "completed": 5499,
+    "dropped_iterations": 2002,
+    "auth_errors": 0,
+    "p50_ms": 1322.484,
+    "p95_ms": 1764.793,
+    "p99_ms": 2061.499,
+    "max_ms": 3510.3,
+    "approved": 4992,
+    "declined": 507,
+    "rules_fallback": 4646
+   },
+   {
+    "label": "w4t1_idx_250_r1",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "5.49",
+     "12.22",
+     "30.64"
+    ],
+    "finished_utc": "2026-10-22T01:49:17Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 4.749,
+    "p95_ms": 49.602,
+    "p99_ms": 90.267,
+    "max_ms": 304.3,
+    "approved": 1553,
+    "declined": 2198,
+    "rules_fallback": 4
+   },
+   {
+    "label": "w4t1_idx_250_r2",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "13.00",
+     "11.88",
+     "22.91"
+    ],
+    "finished_utc": "2026-10-22T01:56:23Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 4.609,
+    "p95_ms": 51.061,
+    "p99_ms": 153.518,
+    "max_ms": 281.1,
+    "approved": 1555,
+    "declined": 2196,
+    "rules_fallback": 20
+   },
+   {
+    "label": "w4t1_idx_250_r3",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "6.74",
+     "8.62",
+     "16.90"
+    ],
+    "finished_utc": "2026-10-22T02:03:33Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 44.655,
+    "p95_ms": 48.242,
+    "p99_ms": 161.893,
+    "max_ms": 337.4,
+    "approved": 1578,
+    "declined": 2173,
+    "rules_fallback": 0
+   },
+   {
+    "label": "w4t1_idx_500_r1",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "7.40",
+     "9.65",
+     "24.61"
+    ],
+    "finished_utc": "2026-10-22T01:53:49Z",
+    "completed": 6311,
+    "dropped_iterations": 1190,
+    "auth_errors": 0,
+    "p50_ms": 1131.026,
+    "p95_ms": 1523.979,
+    "p99_ms": 1797.785,
+    "max_ms": 2831.7,
+    "approved": 2606,
+    "declined": 3705,
+    "rules_fallback": 4
+   },
+   {
+    "label": "w4t1_idx_500_r2",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "7.80",
+     "10.02",
+     "19.31"
+    ],
+    "finished_utc": "2026-10-22T02:00:41Z",
+    "completed": 5866,
+    "dropped_iterations": 1635,
+    "auth_errors": 0,
+    "p50_ms": 1204.852,
+    "p95_ms": 1621.201,
+    "p99_ms": 1941.579,
+    "max_ms": 2633.9,
+    "approved": 2515,
+    "declined": 3351,
+    "rules_fallback": 71
+   },
+   {
+    "label": "w4t1_idx_500_r3",
+    "setting": "w4t1_idx",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "5.46",
+     "7.66",
+     "14.56"
+    ],
+    "finished_utc": "2026-10-22T02:07:34Z",
+    "completed": 6419,
+    "dropped_iterations": 1082,
+    "auth_errors": 0,
+    "p50_ms": 1105.395,
+    "p95_ms": 1469.907,
+    "p99_ms": 1786.472,
+    "max_ms": 2514.5,
+    "approved": 2707,
+    "declined": 3712,
+    "rules_fallback": 7
+   }
+  ],
+  "summary": [
+   {
+    "setting": "w1_idx",
+    "offered_per_s": 250,
+    "runs": 3,
+    "median_p50_ms": 23.77,
+    "median_p95_ms": 81.977,
+    "median_p99_ms": 138.416,
+    "median_rules_fallback": 379,
+    "median_dropped": 0,
+    "median_completed": 3751,
+    "p50_range_ms": [
+     22.972,
+     58.035
+    ],
+    "p99_range_ms": [
+     94.918,
+     291.084
+    ],
+    "fallback_range": [
+     184,
+     2245
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w1_noidx",
+    "offered_per_s": 250,
+    "runs": 3,
+    "median_p50_ms": 24.988,
+    "median_p95_ms": 85.878,
+    "median_p99_ms": 144.998,
+    "median_rules_fallback": 622,
+    "median_dropped": 0,
+    "median_completed": 3750,
+    "p50_range_ms": [
+     23.096,
+     37.641
+    ],
+    "p99_range_ms": [
+     86.36,
+     215.479
+    ],
+    "fallback_range": [
+     222,
+     996
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_idx",
+    "offered_per_s": 250,
+    "runs": 3,
+    "median_p50_ms": 4.749,
+    "median_p95_ms": 49.602,
+    "median_p99_ms": 153.518,
+    "median_rules_fallback": 4,
+    "median_dropped": 0,
+    "median_completed": 3751,
+    "p50_range_ms": [
+     4.609,
+     44.655
+    ],
+    "p99_range_ms": [
+     90.267,
+     161.893
+    ],
+    "fallback_range": [
+     0,
+     20
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w1_idx",
+    "offered_per_s": 500,
+    "runs": 3,
+    "median_p50_ms": 1302.905,
+    "median_p95_ms": 1715.17,
+    "median_p99_ms": 2032.763,
+    "median_rules_fallback": 4560,
+    "median_dropped": 1928,
+    "median_completed": 5572,
+    "p50_range_ms": [
+     1297.218,
+     1313.172
+    ],
+    "p99_range_ms": [
+     1992.397,
+     2036.404
+    ],
+    "fallback_range": [
+     4251,
+     4839
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w1_noidx",
+    "offered_per_s": 500,
+    "runs": 3,
+    "median_p50_ms": 1346.142,
+    "median_p95_ms": 1773.633,
+    "median_p99_ms": 2088.691,
+    "median_rules_fallback": 4840,
+    "median_dropped": 2075,
+    "median_completed": 5426,
+    "p50_range_ms": [
+     1322.484,
+     1380.636
+    ],
+    "p99_range_ms": [
+     2061.499,
+     2170.162
+    ],
+    "fallback_range": [
+     4646,
+     4884
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_idx",
+    "offered_per_s": 500,
+    "runs": 3,
+    "median_p50_ms": 1131.026,
+    "median_p95_ms": 1523.979,
+    "median_p99_ms": 1797.785,
+    "median_rules_fallback": 7,
+    "median_dropped": 1190,
+    "median_completed": 6311,
+    "p50_range_ms": [
+     1105.395,
+     1204.852
+    ],
+    "p99_range_ms": [
+     1786.472,
+     1941.579
+    ],
+    "fallback_range": [
+     4,
+     71
+    ],
+    "auth_errors_total": 0
+   }
+  ]
+ },
+ "after_fix": {
+  "rows": [
+   {
+    "label": "w1_nodelay_250_r1",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "9.42",
+     "6.92",
+     "7.07"
+    ],
+    "finished_utc": "2026-10-22T02:41:26Z",
+    "completed": 3750,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 31.788,
+    "p95_ms": 99.228,
+    "p99_ms": 185.039,
+    "max_ms": 464.5,
+    "approved": 2089,
+    "declined": 1661,
+    "rules_fallback": 864
+   },
+   {
+    "label": "w1_nodelay_250_r2",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "6.24",
+     "7.13",
+     "7.28"
+    ],
+    "finished_utc": "2026-10-22T02:48:07Z",
+    "completed": 3722,
+    "dropped_iterations": 28,
+    "auth_errors": 0,
+    "p50_ms": 54.346,
+    "p95_ms": 326.823,
+    "p99_ms": 891.896,
+    "max_ms": 1492.3,
+    "approved": 2625,
+    "declined": 1097,
+    "rules_fallback": 1851
+   },
+   {
+    "label": "w1_nodelay_250_r3",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "9.08",
+     "8.63",
+     "7.90"
+    ],
+    "finished_utc": "2026-10-22T02:52:20Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 30.831,
+    "p95_ms": 91.249,
+    "p99_ms": 143.889,
+    "max_ms": 440.3,
+    "approved": 2055,
+    "declined": 1696,
+    "rules_fallback": 815
+   },
+   {
+    "label": "w1_nodelay_500_r1",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "9.73",
+     "8.12",
+     "7.53"
+    ],
+    "finished_utc": "2026-10-22T02:44:09Z",
+    "completed": 5285,
+    "dropped_iterations": 2215,
+    "auth_errors": 0,
+    "p50_ms": 1393.459,
+    "p95_ms": 1846.73,
+    "p99_ms": 2111.351,
+    "max_ms": 2789.3,
+    "approved": 4951,
+    "declined": 334,
+    "rules_fallback": 4736
+   },
+   {
+    "label": "w1_nodelay_500_r2",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "12.23",
+     "8.75",
+     "7.86"
+    ],
+    "finished_utc": "2026-10-22T02:51:04Z",
+    "completed": 5319,
+    "dropped_iterations": 2181,
+    "auth_errors": 0,
+    "p50_ms": 1403.887,
+    "p95_ms": 1921.839,
+    "p99_ms": 2259.318,
+    "max_ms": 2981.0,
+    "approved": 5082,
+    "declined": 237,
+    "rules_fallback": 4917
+   },
+   {
+    "label": "w1_nodelay_500_r3",
+    "setting": "w1_nodelay",
+    "workers": 1,
+    "threads_per_worker": 0,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "5.83",
+     "7.37",
+     "7.50"
+    ],
+    "finished_utc": "2026-10-22T02:55:06Z",
+    "completed": 5490,
+    "dropped_iterations": 2010,
+    "auth_errors": 0,
+    "p50_ms": 1320.992,
+    "p95_ms": 1749.81,
+    "p99_ms": 2080.474,
+    "max_ms": 2740.5,
+    "approved": 4952,
+    "declined": 538,
+    "rules_fallback": 4569
+   },
+   {
+    "label": "w4t1_nodelay_1000_r1",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 1000,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "5.78",
+     "7.02",
+     "7.34"
+    ],
+    "finished_utc": "2026-10-22T03:00:09Z",
+    "completed": 11314,
+    "dropped_iterations": 3686,
+    "auth_errors": 0,
+    "p50_ms": 1219.49,
+    "p95_ms": 1663.966,
+    "p99_ms": 1873.261,
+    "max_ms": 2568.3,
+    "approved": 5051,
+    "declined": 6263,
+    "rules_fallback": 496
+   },
+   {
+    "label": "w4t1_nodelay_250_r1",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "9.87",
+     "7.60",
+     "7.31"
+    ],
+    "finished_utc": "2026-10-22T02:42:41Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 4.722,
+    "p95_ms": 17.517,
+    "p99_ms": 74.442,
+    "max_ms": 141.8,
+    "approved": 1584,
+    "declined": 2167,
+    "rules_fallback": 11
+   },
+   {
+    "label": "w4t1_nodelay_250_r2",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "5.36",
+     "7.40",
+     "7.39"
+    ],
+    "finished_utc": "2026-10-22T02:46:53Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 3.846,
+    "p95_ms": 8.042,
+    "p99_ms": 15.878,
+    "max_ms": 65.8,
+    "approved": 1580,
+    "declined": 2171,
+    "rules_fallback": 3
+   },
+   {
+    "label": "w4t1_nodelay_250_r3",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 250,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "5.97",
+     "7.88",
+     "7.68"
+    ],
+    "finished_utc": "2026-10-22T02:53:37Z",
+    "completed": 3751,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 4.333,
+    "p95_ms": 20.183,
+    "p99_ms": 99.148,
+    "max_ms": 230.6,
+    "approved": 1591,
+    "declined": 2160,
+    "rules_fallback": 20
+   },
+   {
+    "label": "w4t1_nodelay_500_r1",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "8.32",
+     "8.29",
+     "7.66"
+    ],
+    "finished_utc": "2026-10-22T02:45:38Z",
+    "completed": 7501,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 6.107,
+    "p95_ms": 75.102,
+    "p99_ms": 256.964,
+    "max_ms": 655.2,
+    "approved": 3191,
+    "declined": 4310,
+    "rules_fallback": 43
+   },
+   {
+    "label": "w4t1_nodelay_500_r2",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 2,
+    "host_load_avg_1_5_15_before": [
+     "5.32",
+     "6.83",
+     "7.16"
+    ],
+    "finished_utc": "2026-10-22T02:49:32Z",
+    "completed": 7501,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 6.851,
+    "p95_ms": 42.74,
+    "p99_ms": 173.688,
+    "max_ms": 590.3,
+    "approved": 3175,
+    "declined": 4326,
+    "rules_fallback": 22
+   },
+   {
+    "label": "w4t1_nodelay_500_r3",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 500,
+    "repeat": 3,
+    "host_load_avg_1_5_15_before": [
+     "7.46",
+     "7.58",
+     "7.56"
+    ],
+    "finished_utc": "2026-10-22T02:56:33Z",
+    "completed": 7501,
+    "dropped_iterations": 0,
+    "auth_errors": 0,
+    "p50_ms": 14.248,
+    "p95_ms": 112.365,
+    "p99_ms": 173.612,
+    "max_ms": 361.8,
+    "approved": 3240,
+    "declined": 4261,
+    "rules_fallback": 132
+   },
+   {
+    "label": "w4t1_nodelay_750_r1",
+    "setting": "w4t1_nodelay",
+    "workers": 4,
+    "threads_per_worker": 1,
+    "indexes_v3_v4": true,
+    "offered_per_s": 750,
+    "repeat": 1,
+    "host_load_avg_1_5_15_before": [
+     "6.06",
+     "7.27",
+     "7.45"
+    ],
+    "finished_utc": "2026-10-22T02:58:15Z",
+    "completed": 10233,
+    "dropped_iterations": 1017,
+    "auth_errors": 0,
+    "p50_ms": 712.253,
+    "p95_ms": 1288.322,
+    "p99_ms": 1534.681,
+    "max_ms": 2242.2,
+    "approved": 4620,
+    "declined": 5613,
+    "rules_fallback": 519
+   }
+  ],
+  "summary": [
+   {
+    "setting": "w1_nodelay",
+    "offered_per_s": 250,
+    "runs": 3,
+    "median_p50_ms": 31.788,
+    "median_p95_ms": 99.228,
+    "median_p99_ms": 185.039,
+    "median_rules_fallback": 864,
+    "median_dropped": 0,
+    "median_completed": 3750,
+    "p50_range_ms": [
+     30.831,
+     54.346
+    ],
+    "p99_range_ms": [
+     143.889,
+     891.896
+    ],
+    "fallback_range": [
+     815,
+     1851
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_nodelay",
+    "offered_per_s": 250,
+    "runs": 3,
+    "median_p50_ms": 4.333,
+    "median_p95_ms": 17.517,
+    "median_p99_ms": 74.442,
+    "median_rules_fallback": 11,
+    "median_dropped": 0,
+    "median_completed": 3751,
+    "p50_range_ms": [
+     3.846,
+     4.722
+    ],
+    "p99_range_ms": [
+     15.878,
+     99.148
+    ],
+    "fallback_range": [
+     3,
+     20
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w1_nodelay",
+    "offered_per_s": 500,
+    "runs": 3,
+    "median_p50_ms": 1393.459,
+    "median_p95_ms": 1846.73,
+    "median_p99_ms": 2111.351,
+    "median_rules_fallback": 4736,
+    "median_dropped": 2181,
+    "median_completed": 5319,
+    "p50_range_ms": [
+     1320.992,
+     1403.887
+    ],
+    "p99_range_ms": [
+     2080.474,
+     2259.318
+    ],
+    "fallback_range": [
+     4569,
+     4917
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_nodelay",
+    "offered_per_s": 500,
+    "runs": 3,
+    "median_p50_ms": 6.851,
+    "median_p95_ms": 75.102,
+    "median_p99_ms": 173.688,
+    "median_rules_fallback": 43,
+    "median_dropped": 0,
+    "median_completed": 7501,
+    "p50_range_ms": [
+     6.107,
+     14.248
+    ],
+    "p99_range_ms": [
+     173.612,
+     256.964
+    ],
+    "fallback_range": [
+     22,
+     132
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_nodelay",
+    "offered_per_s": 750,
+    "runs": 1,
+    "median_p50_ms": 712.253,
+    "median_p95_ms": 1288.322,
+    "median_p99_ms": 1534.681,
+    "median_rules_fallback": 519,
+    "median_dropped": 1017,
+    "median_completed": 10233,
+    "p50_range_ms": [
+     712.253,
+     712.253
+    ],
+    "p99_range_ms": [
+     1534.681,
+     1534.681
+    ],
+    "fallback_range": [
+     519,
+     519
+    ],
+    "auth_errors_total": 0
+   },
+   {
+    "setting": "w4t1_nodelay",
+    "offered_per_s": 1000,
+    "runs": 1,
+    "median_p50_ms": 1219.49,
+    "median_p95_ms": 1663.966,
+    "median_p99_ms": 1873.261,
+    "median_rules_fallback": 496,
+    "median_dropped": 3686,
+    "median_completed": 11314,
+    "p50_range_ms": [
+     1219.49,
+     1219.49
+    ],
+    "p99_range_ms": [
+     1873.261,
+     1873.261
+    ],
+    "fallback_range": [
+     496,
+     496
+    ],
+    "auth_errors_total": 0
+   }
+  ],
+  "exploratory_single_runs": [
+   {
+    "label": "w4t1_nodelay_750_r1",
+    "offered_per_s": 750,
+    "workers": 4,
+    "threads_per_worker": 1,
+    "completed": 10233,
+    "dropped_iterations": 1017,
+    "auth_errors": 0,
+    "p50_ms": 712.253,
+    "p95_ms": 1288.322,
+    "p99_ms": 1534.681,
+    "max_ms": 2242.2,
+    "approved": 4620,
+    "declined": 5613,
+    "rules_fallback": 519
+   },
+   {
+    "label": "w4t1_nodelay_1000_r1",
+    "offered_per_s": 1000,
+    "workers": 4,
+    "threads_per_worker": 1,
+    "completed": 11314,
+    "dropped_iterations": 3686,
+    "auth_errors": 0,
+    "p50_ms": 1219.49,
+    "p95_ms": 1663.966,
+    "p99_ms": 1873.261,
+    "max_ms": 2568.3,
+    "approved": 5051,
+    "declined": 6263,
+    "rules_fallback": 496
+   }
+  ]
+ }
+}

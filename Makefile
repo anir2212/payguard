@@ -1,4 +1,4 @@
-.PHONY: up down build simulate test run stream-up stream-down topics outbox observe-up observe-down
+.PHONY: case-review-browser up down build simulate test run stream-up stream-down topics outbox observe-up observe-down
 
 up:
 	docker compose --profile stream --profile packaged up -d --build
@@ -35,3 +35,6 @@ observe-up:
 
 observe-down:
 	docker compose --profile observe stop prometheus grafana
+
+case-review-browser:
+	cd fraud && .venv/bin/python -m payguard_fraud.case_review_browser

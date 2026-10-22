@@ -1,0 +1,925 @@
+{
+    "fixtureId": "payguard-settlement-synthetic-v1",
+    "settlementDate": "2026-01-15",
+    "networkRows": [
+        {
+            "networkRow": 1,
+            "captureId": "cap_fx_71d4d46355da",
+            "status": "MATCHED",
+            "expectedMinor": 14987,
+            "observedMinor": 14987
+        },
+        {
+            "networkRow": 2,
+            "captureId": "cap_fx_7abfce6726be",
+            "status": "MATCHED",
+            "expectedMinor": 6960,
+            "observedMinor": 6960
+        },
+        {
+            "networkRow": 3,
+            "captureId": "cap_fx_249a28d5be85",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 5697
+        },
+        {
+            "networkRow": 4,
+            "captureId": "cap_fx_5123d16f7154",
+            "status": "MATCHED",
+            "expectedMinor": 6396,
+            "observedMinor": 6396
+        },
+        {
+            "networkRow": 5,
+            "captureId": "cap_fx_2b83521bcc62",
+            "status": "MATCHED",
+            "expectedMinor": 7166,
+            "observedMinor": 7166
+        },
+        {
+            "networkRow": 6,
+            "captureId": "cap_fx_a58d4c57a035",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 8102,
+            "observedMinor": 8135
+        },
+        {
+            "networkRow": 7,
+            "captureId": "cap_fx_13a7a9684761",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 5745,
+            "observedMinor": 5831
+        },
+        {
+            "networkRow": 8,
+            "captureId": "cap_fx_41f86541f60d",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 13744,
+            "observedMinor": 6872
+        },
+        {
+            "networkRow": 9,
+            "captureId": "cap_fx_a1ec319b5cec",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 19977,
+            "observedMinor": 19977
+        },
+        {
+            "networkRow": 10,
+            "captureId": "cap_fx_822352921f4a",
+            "status": "MATCHED",
+            "expectedMinor": 2782,
+            "observedMinor": 2782
+        },
+        {
+            "networkRow": 11,
+            "captureId": "cap_fx_2e4ad67bbacd",
+            "status": "MATCHED",
+            "expectedMinor": 16484,
+            "observedMinor": 16484
+        },
+        {
+            "networkRow": 12,
+            "captureId": "cap_fx_b57e80b8fed9",
+            "status": "MATCHED",
+            "expectedMinor": 17955,
+            "observedMinor": 17955
+        },
+        {
+            "networkRow": 13,
+            "captureId": "cap_fx_50574bba4497",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 17644,
+            "observedMinor": 17849
+        },
+        {
+            "networkRow": 14,
+            "captureId": "cap_fx_4f678aa3d6b4",
+            "status": "MATCHED",
+            "expectedMinor": 14204,
+            "observedMinor": 14204
+        },
+        {
+            "networkRow": 15,
+            "captureId": "cap_fx_4df95ed457f0",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 17131
+        },
+        {
+            "networkRow": 16,
+            "captureId": "cap_fx_0bccec5329f1",
+            "status": "MATCHED",
+            "expectedMinor": 18740,
+            "observedMinor": 18740
+        },
+        {
+            "networkRow": 17,
+            "captureId": "cap_fx_550a7a220908",
+            "status": "MATCHED",
+            "expectedMinor": 17799,
+            "observedMinor": 17799
+        },
+        {
+            "networkRow": 18,
+            "captureId": "cap_fx_c6d0056a1f04",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 26216,
+            "observedMinor": 13108
+        },
+        {
+            "networkRow": 19,
+            "captureId": "cap_fx_c785b71b358a",
+            "status": "MATCHED",
+            "expectedMinor": 9337,
+            "observedMinor": 9337
+        },
+        {
+            "networkRow": 20,
+            "captureId": "cap_fx_60f415824f6c",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 16024,
+            "observedMinor": 15680
+        },
+        {
+            "networkRow": 21,
+            "captureId": "cap_fx_34f8ff987321",
+            "status": "MATCHED",
+            "expectedMinor": 3150,
+            "observedMinor": 3150
+        },
+        {
+            "networkRow": 22,
+            "captureId": "cap_fx_4f678aa3d6b4",
+            "status": "DUPLICATE",
+            "expectedMinor": 14204,
+            "observedMinor": 14204
+        },
+        {
+            "networkRow": 23,
+            "captureId": "cap_fx_951dc9ffb943",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 8877
+        },
+        {
+            "networkRow": 24,
+            "captureId": "cap_fx_3f076decc86b",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 9906
+        },
+        {
+            "networkRow": 25,
+            "captureId": "cap_fx_5e751eda2495",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 39620,
+            "observedMinor": 19810
+        },
+        {
+            "networkRow": 26,
+            "captureId": "cap_fx_fcac02c61511",
+            "status": "MATCHED",
+            "expectedMinor": 18794,
+            "observedMinor": 18794
+        },
+        {
+            "networkRow": 27,
+            "captureId": "cap_fx_466b683168ad",
+            "status": "MATCHED",
+            "expectedMinor": 3831,
+            "observedMinor": 3831
+        },
+        {
+            "networkRow": 28,
+            "captureId": "cap_fx_e0e6cc2f4d88",
+            "status": "MATCHED",
+            "expectedMinor": 14670,
+            "observedMinor": 14670
+        },
+        {
+            "networkRow": 29,
+            "captureId": "cap_fx_0da655453440",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 12888,
+            "observedMinor": 12888
+        },
+        {
+            "networkRow": 30,
+            "captureId": "cap_fx_65b717824711",
+            "status": "MATCHED",
+            "expectedMinor": 3211,
+            "observedMinor": 3211
+        },
+        {
+            "networkRow": 31,
+            "captureId": "cap_fx_b57e80b8fed9",
+            "status": "DUPLICATE",
+            "expectedMinor": 17955,
+            "observedMinor": 17955
+        },
+        {
+            "networkRow": 32,
+            "captureId": "cap_fx_0ff77b3b7105",
+            "status": "MATCHED",
+            "expectedMinor": 15164,
+            "observedMinor": 15164
+        },
+        {
+            "networkRow": 33,
+            "captureId": "cap_fx_a2fc8a2454f4",
+            "status": "MATCHED",
+            "expectedMinor": 315,
+            "observedMinor": 315
+        },
+        {
+            "networkRow": 34,
+            "captureId": "cap_fx_856304930310",
+            "status": "MATCHED",
+            "expectedMinor": 7195,
+            "observedMinor": 7195
+        },
+        {
+            "networkRow": 35,
+            "captureId": "cap_fx_e10039a2527f",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 12602,
+            "observedMinor": 12615
+        },
+        {
+            "networkRow": 36,
+            "captureId": "cap_fx_7f744d89aa3e",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 4674,
+            "observedMinor": 4451
+        },
+        {
+            "networkRow": 37,
+            "captureId": "cap_fx_49c494125930",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 7538
+        },
+        {
+            "networkRow": 38,
+            "captureId": "cap_fx_ddf0973b43d2",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 9398,
+            "observedMinor": 9398
+        },
+        {
+            "networkRow": 39,
+            "captureId": "cap_fx_e9d8eecc49d7",
+            "status": "MATCHED",
+            "expectedMinor": 14565,
+            "observedMinor": 14565
+        },
+        {
+            "networkRow": 40,
+            "captureId": "cap_fx_564d6dfd6e74",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 11374
+        },
+        {
+            "networkRow": 41,
+            "captureId": "cap_fx_2c3558e4c875",
+            "status": "MATCHED",
+            "expectedMinor": 2192,
+            "observedMinor": 2192
+        },
+        {
+            "networkRow": 42,
+            "captureId": "cap_fx_5123d16f7154",
+            "status": "DUPLICATE",
+            "expectedMinor": 6396,
+            "observedMinor": 6396
+        },
+        {
+            "networkRow": 43,
+            "captureId": "cap_fx_c146eb0cebeb",
+            "status": "AMOUNT_MISMATCH",
+            "expectedMinor": 14487,
+            "observedMinor": 14350
+        },
+        {
+            "networkRow": 44,
+            "captureId": "cap_fx_665a2832da55",
+            "status": "MATCHED",
+            "expectedMinor": 13270,
+            "observedMinor": 13270
+        },
+        {
+            "networkRow": 45,
+            "captureId": "cap_fx_c6f085bd4b26",
+            "status": "MATCHED",
+            "expectedMinor": 3899,
+            "observedMinor": 3899
+        },
+        {
+            "networkRow": 46,
+            "captureId": "cap_fx_cb1505a49270",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 2155
+        },
+        {
+            "networkRow": 47,
+            "captureId": "cap_fx_e851e9bdf961",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 4135
+        },
+        {
+            "networkRow": 48,
+            "captureId": "cap_fx_8e7b171d8644",
+            "status": "MATCHED",
+            "expectedMinor": 2246,
+            "observedMinor": 2246
+        },
+        {
+            "networkRow": 49,
+            "captureId": "cap_fx_c94c463f8ad5",
+            "status": "MISSING_LEDGER",
+            "observedMinor": 6766
+        },
+        {
+            "networkRow": 50,
+            "captureId": "cap_fx_09fb0cec0f95",
+            "status": "MATCHED",
+            "expectedMinor": 17388,
+            "observedMinor": 17388
+        },
+        {
+            "networkRow": 51,
+            "captureId": "cap_fx_ad9071a16af7",
+            "status": "MATCHED",
+            "expectedMinor": 9108,
+            "observedMinor": 9108
+        }
+    ],
+    "missingNetwork": [
+        {
+            "captureId": "cap_fx_711aa693127c",
+            "status": "MISSING_NETWORK",
+            "expectedMinor": 4999,
+            "expectedCurrency": "SGD"
+        },
+        {
+            "captureId": "cap_fx_7997aa3c43b7",
+            "status": "MISSING_NETWORK",
+            "expectedMinor": 1314,
+            "expectedCurrency": "SGD"
+        },
+        {
+            "captureId": "cap_fx_f332ac938a8c",
+            "status": "MISSING_NETWORK",
+            "expectedMinor": 11221,
+            "expectedCurrency": "SGD"
+        }
+    ],
+    "journal": [
+        {
+            "captureId": "cap_fx_09fb0cec0f95",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 17388,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 17388,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_0bccec5329f1",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 18740,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 18740,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_0da655453440",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 12888,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 12888,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_0ff77b3b7105",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 15164,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 15164,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_13a7a9684761",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 5831,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 5745,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_2b83521bcc62",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 7166,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 7166,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_2c3558e4c875",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 2192,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 2192,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_2e4ad67bbacd",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 16628,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 16484,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_34f8ff987321",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 3150,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 3150,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_3f076decc86b",
+            "status": "WRONG_CURRENCY_JOURNAL",
+            "captureMinor": 9906,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 0,
+            "postedCurrencies": [
+                "USD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_41f86541f60d",
+            "status": "DUPLICATE_JOURNAL",
+            "captureMinor": 6872,
+            "captureCurrency": "SGD",
+            "journalCount": 2,
+            "postedMinor": 13744,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_466b683168ad",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 3831,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 3831,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_49c494125930",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 7538,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        },
+        {
+            "captureId": "cap_fx_4df95ed457f0",
+            "status": "WRONG_CURRENCY_JOURNAL",
+            "captureMinor": 17131,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 0,
+            "postedCurrencies": [
+                "USD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_4f678aa3d6b4",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 14204,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 14204,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_50574bba4497",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 17849,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 17644,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_5123d16f7154",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 6396,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 6396,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_550a7a220908",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 17799,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 17799,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_5e751eda2495",
+            "status": "DUPLICATE_JOURNAL",
+            "captureMinor": 19810,
+            "captureCurrency": "SGD",
+            "journalCount": 2,
+            "postedMinor": 39620,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_60f415824f6c",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 16024,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 16024,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_65b717824711",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 3211,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 3211,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_665a2832da55",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 13270,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 13270,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_711aa693127c",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 4999,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 4999,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_71d4d46355da",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 14987,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 14987,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_7997aa3c43b7",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 1314,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 1314,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_7abfce6726be",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 6960,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 6960,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_7f744d89aa3e",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 4674,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 4674,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_822352921f4a",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 2782,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 2782,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_856304930310",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 7195,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 7195,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_8e7b171d8644",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 2246,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 2246,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_951dc9ffb943",
+            "status": "WRONG_CURRENCY_JOURNAL",
+            "captureMinor": 8877,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 0,
+            "postedCurrencies": [
+                "USD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_a1ec319b5cec",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 19977,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 19977,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_a2fc8a2454f4",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 315,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 315,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_a58d4c57a035",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 8135,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 8102,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_ad9071a16af7",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 9108,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 9108,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_b57e80b8fed9",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 17955,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 17955,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_c146eb0cebeb",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 14487,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 14487,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_c6d0056a1f04",
+            "status": "DUPLICATE_JOURNAL",
+            "captureMinor": 13108,
+            "captureCurrency": "SGD",
+            "journalCount": 2,
+            "postedMinor": 26216,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_c6f085bd4b26",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 3899,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 3899,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_c785b71b358a",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 9635,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 9337,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_cb1505a49270",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 2155,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        },
+        {
+            "captureId": "cap_fx_d2bdca3d62f5",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 5803,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        },
+        {
+            "captureId": "cap_fx_ddf0973b43d2",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 9398,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 9398,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_e0e6cc2f4d88",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 14670,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 14670,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_e10039a2527f",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 12602,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 12602,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_e851e9bdf961",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 4135,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        },
+        {
+            "captureId": "cap_fx_e9d8eecc49d7",
+            "status": "JOURNAL_AMOUNT_MISMATCH",
+            "captureMinor": 14662,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 14565,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_eb48aa69f9eb",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 11187,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        },
+        {
+            "captureId": "cap_fx_f332ac938a8c",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 11221,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 11221,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_fcac02c61511",
+            "status": "JOURNAL_POSTED",
+            "captureMinor": 18794,
+            "captureCurrency": "SGD",
+            "journalCount": 1,
+            "postedMinor": 18794,
+            "postedCurrencies": [
+                "SGD"
+            ]
+        },
+        {
+            "captureId": "cap_fx_ff2beb255ad5",
+            "status": "MISSING_JOURNAL",
+            "captureMinor": 1037,
+            "captureCurrency": "SGD",
+            "journalCount": 0,
+            "postedMinor": 0,
+            "postedCurrencies": []
+        }
+    ]
+}

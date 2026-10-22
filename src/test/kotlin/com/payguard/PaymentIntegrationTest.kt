@@ -18,6 +18,7 @@ import com.payguard.service.FraudScorer
 import com.payguard.service.FraudAssessment
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -171,6 +172,36 @@ class PaymentIntegrationTest {
     }
 
     @Test
+    fun journalBalanceCheckUsesThePostingsJournalIndex() {
+        database.transaction { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("SET LOCAL enable_seqscan = off")
+                val plan = statement.executeQuery(
+                    "EXPLAIN SELECT count(id), coalesce(sum(amount_minor), 0) FROM postings " +
+                        "WHERE journal_id = '00000000-0000-0000-0000-000000000000'").use { result ->
+                    buildList { while (result.next()) add(result.getString(1)) }.joinToString("\n")
+                }
+                assertTrue("postings_journal_idx" in plan, plan)
+            }
+        }
+    }
+
+    @Test
+    fun outboxPollingUsesThePendingIndex() {
+        database.transaction { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("SET LOCAL enable_seqscan = off")
+                val plan = statement.executeQuery(
+                    "EXPLAIN SELECT id FROM outbox WHERE published_at IS NULL AND discarded_at IS NULL " +
+                        "ORDER BY created_at,id LIMIT 100").use { result ->
+                    buildList { while (result.next()) add(result.getString(1)) }.joinToString("\n")
+                }
+                assertTrue("outbox_pending_idx" in plan, plan)
+            }
+        }
+    }
+
+    @Test
     fun settlementReportSeparatesEveryDiscrepancy() {
         val card = activeCard()
         cards.setControls(card, SetControlsRequest(SpendControls(velocityCount = 1_000), key()))
@@ -249,6 +280,176 @@ class PaymentIntegrationTest {
         assertTrue(report.items.any { it.captureId == missingCapture && it.status == "MISSING_LEDGER" })
         assertTrue(report.items.any { it.captureId == mismatchedCapture && it.status == "AMOUNT_MISMATCH" &&
             it.expectedMinor == 650L && it.observedMinor == 700L })
+    }
+
+    /** Approves an authorization on a fresh SGD card and returns (cardId, authId). */
+    private fun approvedAuth(amount: Long, merchant: String = "shop"): Pair<String, String> {
+        val card = activeCard()
+        val auth = "auth_${UUID.randomUUID()}"
+        assertEquals("APPROVED", payments.authorize(AuthorizeRequest(
+            auth, card, merchant, "5411", "SG", "SGD", amount, idempotencyKey = key(),
+        )).status)
+        return card to auth
+    }
+
+    /** Writes a capture record without a journal, as a fault outside the API transaction would. */
+    private fun captureRowOnly(auth: String, amount: Long): String {
+        val capture = "cap_${UUID.randomUUID()}"
+        database.transaction { connection ->
+            connection.prepareStatement(
+                "INSERT INTO captures(id,auth_id,amount_minor,billing_minor) VALUES (?,?,?,?)"
+            ).use {
+                it.setString(1, capture)
+                it.setString(2, auth)
+                it.setLong(3, amount)
+                it.setLong(4, amount)
+                it.executeUpdate()
+            }
+        }
+        return capture
+    }
+
+    /** Moves capture records to an otherwise unused UTC date so each audit test has exact counts. */
+    private fun bookOn(date: LocalDate, vararg captureIds: String) {
+        database.transaction { connection ->
+            connection.prepareStatement("UPDATE captures SET created_at=? WHERE id=?").use { statement ->
+                for (id in captureIds) {
+                    statement.setObject(1, date.atTime(12, 0).atOffset(java.time.ZoneOffset.UTC))
+                    statement.setString(2, id)
+                    statement.addBatch()
+                }
+                statement.executeBatch()
+            }
+        }
+    }
+
+    @Test
+    fun journalIntegrityReportsCleanCaptureAsPosted() {
+        val date = LocalDate.of(2001, 1, 1)
+        val (_, auth) = approvedAuth(400)
+        val capture = "cap_${UUID.randomUUID()}"
+        payments.capture(CaptureRequest(capture, auth, 400, key()))
+        bookOn(date, capture)
+        val service = SettlementService(database)
+        val audit = service.journalIntegrity(date)
+        assertEquals(1, audit.capturesChecked)
+        assertEquals(1, audit.posted)
+        assertEquals(0, audit.missingJournal + audit.duplicateJournal + audit.wrongCurrencyJournal +
+            audit.journalAmountMismatch)
+        val item = audit.items.single()
+        assertEquals(capture, item.captureId)
+        assertEquals("JOURNAL_POSTED", item.status)
+        assertEquals(1, item.journalCount)
+        assertEquals(400L, item.postedMinor)
+        assertEquals(listOf("SGD"), item.postedCurrencies)
+        val report = service.reconcile(date, "capture_id,amount_minor,currency\n$capture,400,SGD")
+        assertEquals(1, report.matched)
+        assertEquals(1, report.journalIntegrity.posted)
+    }
+
+    @Test
+    fun journalIntegrityFindsCaptureMissingFromBothJournalAndNetworkFile() {
+        val date = LocalDate.of(2001, 1, 2)
+        val (_, auth) = approvedAuth(500)
+        val capture = captureRowOnly(auth, 500)
+        bookOn(date, capture)
+        val service = SettlementService(database)
+        assertFalse(service.sample(date).contains(capture))
+        // The network file omits it too, so the network comparison alone has nothing to report.
+        val report = service.reconcile(date, "capture_id,amount_minor,currency")
+        assertTrue(report.items.isEmpty())
+        assertEquals(0, report.matched + report.missingNetwork + report.missingLedger +
+            report.amountMismatch + report.duplicate)
+        val audit = report.journalIntegrity
+        assertEquals(1, audit.capturesChecked)
+        assertEquals(1, audit.missingJournal)
+        assertEquals(0, audit.posted)
+        val item = audit.items.single()
+        assertEquals("MISSING_JOURNAL", item.status)
+        assertEquals(0, item.journalCount)
+        assertEquals(0L, item.postedMinor)
+        assertEquals(500L, item.captureMinor)
+        assertEquals(service.journalIntegrity(date), audit)
+    }
+
+    @Test
+    fun journalIntegrityFlagsDuplicateCaptureJournals() {
+        val date = LocalDate.of(2001, 1, 3)
+        val (card, auth) = approvedAuth(300)
+        val capture = "cap_${UUID.randomUUID()}"
+        payments.capture(CaptureRequest(capture, auth, 300, key()))
+        database.transaction { connection ->
+            Ledger.post(connection, "capture", capture, "SGD", listOf(
+                "card:$card:funding" to -300L,
+                "merchant:shop:clearing:SGD" to 300L,
+            ))
+        }
+        bookOn(date, capture)
+        val service = SettlementService(database)
+        val audit = service.journalIntegrity(date)
+        assertEquals(1, audit.duplicateJournal)
+        assertEquals(0, audit.posted)
+        val item = audit.items.single()
+        assertEquals("DUPLICATE_JOURNAL", item.status)
+        assertEquals(2, item.journalCount)
+        assertEquals(600L, item.postedMinor)
+        // Posted money stays authoritative: the network row disagrees with the doubled posting.
+        val report = service.reconcile(date, "capture_id,amount_minor,currency\n$capture,300,SGD")
+        assertTrue(report.items.single().let {
+            it.status == "AMOUNT_MISMATCH" && it.expectedMinor == 600L && it.observedMinor == 300L
+        })
+    }
+
+    @Test
+    fun journalIntegrityFlagsWrongCurrencyJournalAndNeverTreatsItAsSettled() {
+        val date = LocalDate.of(2001, 1, 4)
+        val (_, auth) = approvedAuth(800)
+        val capture = captureRowOnly(auth, 800)
+        database.transaction { connection ->
+            // Balanced and single-currency, but in USD while the card and capture bill in SGD.
+            Ledger.post(connection, "capture", capture, "USD", listOf(
+                "bank:integrity-test:USD" to -800L,
+                "merchant:shop:clearing:USD" to 800L,
+            ))
+        }
+        bookOn(date, capture)
+        val service = SettlementService(database)
+        val audit = service.journalIntegrity(date)
+        assertEquals(1, audit.wrongCurrencyJournal)
+        val item = audit.items.single()
+        assertEquals("WRONG_CURRENCY_JOURNAL", item.status)
+        assertEquals(1, item.journalCount)
+        assertEquals(0L, item.postedMinor)
+        assertEquals("SGD", item.captureCurrency)
+        assertEquals(listOf("USD"), item.postedCurrencies)
+        assertFalse(service.sample(date).contains(capture))
+        val report = service.reconcile(date, "capture_id,amount_minor,currency\n$capture,800,SGD")
+        assertEquals("MISSING_LEDGER", report.items.single().status)
+        assertEquals(0, report.matched)
+    }
+
+    @Test
+    fun journalIntegrityFlagsAmountMismatchEvenWhenNetworkAgreesWithPosting() {
+        val date = LocalDate.of(2001, 1, 5)
+        val (card, auth) = approvedAuth(700)
+        val capture = captureRowOnly(auth, 700)
+        database.transaction { connection ->
+            Ledger.post(connection, "capture", capture, "SGD", listOf(
+                "card:$card:funding" to -650L,
+                "merchant:shop:clearing:SGD" to 650L,
+            ))
+        }
+        bookOn(date, capture)
+        val service = SettlementService(database)
+        val report = service.reconcile(date, "capture_id,amount_minor,currency\n$capture,650,SGD")
+        // The network file matches the posted ledger, so only the capture-to-journal audit sees the gap.
+        assertEquals(1, report.matched)
+        val audit = report.journalIntegrity
+        assertEquals(1, audit.journalAmountMismatch)
+        val item = audit.items.single()
+        assertEquals("JOURNAL_AMOUNT_MISMATCH", item.status)
+        assertEquals(700L, item.captureMinor)
+        assertEquals(650L, item.postedMinor)
     }
 
     @Test

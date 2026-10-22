@@ -1,0 +1,45 @@
+{
+  "fixtureId": "payguard-settlement-synthetic-v1",
+  "synthetic": true,
+  "statement": "Invented captures and network rows. Not real card-network data and not independent real-world evidence. Labels follow by construction from the case specification in payguard_fraud/settlement_fixture.py and are never passed to the reconciler.",
+  "generator": "python -m payguard_fraud.settlement_fixture generate",
+  "generatorSha256": "4b42344fe13651f59ca5f3b2163261d6bedd4acc5f6a53b9d08558c0de4cb1a9",
+  "seed": 20261020,
+  "settlementDate": "2026-01-15",
+  "billingCurrency": "SGD",
+  "independence": "Network rows are written from the generator's own case table, not from PayGuard's /v1/settlements/sample endpoint or any existing ledger.",
+  "caseCounts": {
+    "clean_match": 20,
+    "network_amount_diff": 4,
+    "network_currency_diff": 3,
+    "network_duplicate_row": 3,
+    "network_omitted": 3,
+    "network_unknown_capture": 3,
+    "journal_missing_network_present": 3,
+    "journal_missing_network_omitted": 3,
+    "journal_duplicate": 3,
+    "journal_wrong_currency": 3,
+    "journal_amount_off_network_booked": 3,
+    "journal_amount_off_network_posted": 3
+  },
+  "ledgerCaptures": 51,
+  "networkRows": 51,
+  "labels": 105,
+  "labelStatusCounts": {
+    "AMOUNT_MISMATCH": 13,
+    "DUPLICATE": 3,
+    "DUPLICATE_JOURNAL": 3,
+    "JOURNAL_AMOUNT_MISMATCH": 6,
+    "JOURNAL_POSTED": 33,
+    "MATCHED": 26,
+    "MISSING_JOURNAL": 6,
+    "MISSING_LEDGER": 9,
+    "MISSING_NETWORK": 3,
+    "WRONG_CURRENCY_JOURNAL": 3
+  },
+  "files": {
+    "ledger_plan.csv": "3bcd066946c183984fa9ba5d78be09a2fe6fbbc5f7b8a0ecfe9df7b8eef3c53b",
+    "network.csv": "1c9de5e597877ae615942bffacf4807a87c0bd7937f541bde249f68241e03984",
+    "labels.csv": "f809fb8895d1db3fa65d447d109c053136230885513ee6d841dcdc2b730c8b10"
+  }
+}

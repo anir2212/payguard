@@ -1,12 +1,121 @@
 # PayGuard measured results
 
+## Repeated load runs, the 500/s ceiling and its fix, 22 October 2026 (afternoon)
+
+Every run here started from a fresh, empty database: its own Compose project with new volumes, removed afterwards. The project's usual volumes were not touched. Each run had a 15-second warm-up at 100/s, a 10-second pause, then the measured 15 seconds of `bench/load_full.js`. There were three repeats of every setting and rate, with the order of settings rotated between repeats. Other applications on the Mac were light this time. Record: [`bench/full_path_repeat_2026-10-22.json`](bench/full_path_repeat_2026-10-22.json); raw k6 summaries: [`bench/full_path_repeat_k6/`](bench/full_path_repeat_k6/).
+
+**Before the fix** (images from commit `c11b991`). Medians of three runs, with the range of rules fallbacks:
+
+| Setting | 250/s p50 / p95 / p99 | 250/s fallback | 500/s completed / dropped | 500/s p50 | 500/s fallback |
+|---|---:|---:|---:|---:|---:|
+| 1 worker, default threads, V3/V4 indexes dropped | 25.0 / 85.9 / 145.0 ms | 622 (222–996) | 5,426 / 2,075 | 1,346 ms | 4,840 |
+| 1 worker, default threads | 23.8 / 82.0 / 138.4 ms | 379 (184–2,245) | 5,572 / 1,928 | 1,303 ms | 4,560 |
+| 4 workers, 1 thread each | 4.7 / 49.6 / 153.5 ms | 4 (0–20) | 6,311 / 1,190 | 1,131 ms | 7 (4–71) |
+
+The repeat confirmed that 4 workers × 1 thread almost removes rules fallback at 250/s. On a fresh database the indexes made no clear difference, as expected: a 15-second run does not grow the tables enough. Their benefit is the growing-table measurement in the follow-up section below.
+
+**Why 500/s still saturated.** At 500/s, 4, 6 and 8 single-thread workers all completed about 430 authorizations a second, although the scorer rarely missed its 50 ms deadline. The diagnosis, step by step:
+- Sampling `pg_stat_activity` during a 4 × 1 run showed all 20 of the API's pooled database connections in use, about 19 of them "idle in transaction". The API holds a connection, and the card row lock, while it waits for the scorer. With the model off, the same load left the pool nearly idle and ran at 1.4 ms p50.
+- k6 sending the same requests straight to the scorer at 500/s got 2 ms p50 with 4 workers, so the scorer was not slow.
+- A Java `HttpClient` probe with the API's settings took 44–49 ms per call to the scorer even with one thread on an idle stack. So did a Python client inside the scorer container, on `GET /health` as well as `POST /score`. A new connection per request took 1.4 ms; only keep-alive connections stalled. With one uvicorn worker a keep-alive call took 1.3 ms, with two it took 48 ms.
+- The cause is in uvicorn 0.54. With `--workers` above 1, uvicorn creates the listening socket itself, with protocol number 0. asyncio turns on `TCP_NODELAY` only for sockets whose protocol is TCP, so every worker connection kept Nagle's algorithm on. uvicorn writes the response headers and body separately, and on a keep-alive connection the body waited for the client's delayed acknowledgement, about 40 ms on Linux. Twenty connections at about 46 ms each allow roughly 435 authorizations a second, which matches what was measured. k6 on the Mac never saw this because Docker Desktop's port forwarder acknowledges immediately.
+
+**The fix.** [`nodelay.py`](fraud/src/payguard_fraud/nodelay.py) is a small subclass of uvicorn's h11 protocol that sets `TCP_NODELAY` on every connection, and Compose starts the scorer with `--http payguard_fraud.nodelay:NoDelayH11Protocol`. With 4 workers a keep-alive call now takes 1.3 ms. The Java probe went from 48.9 ms to 1.5 ms per call with one thread, and from 444 to 1,698 calls a second with 20 threads. Three new tests cover the socket option and uvicorn loading the class.
+
+**After the fix.** Medians of three runs:
+
+| Setting | 250/s p50 / p95 / p99 | 250/s fallback | 500/s completed / dropped | 500/s p50 / p95 / p99 | 500/s fallback |
+|---|---:|---:|---:|---:|---:|
+| 1 worker, default threads | 31.8 / 99.2 / 185.0 ms | 864 (815–1,851) | 5,319 / 2,181 | 1,393 / 1,847 / 2,111 ms | 4,736 |
+| 4 workers, 1 thread each | **4.3 / 17.5 / 74.4 ms** | **11 (3–20)** | **7,501 / 0** | **6.9 / 75.1 / 173.7 ms** | **43 (22–132)** |
+
+With the fix, 4 workers × 1 thread completed every scheduled authorization at 500/s in all three runs, with 0.3–1.8% rules fallback and no errors. One worker is unaffected by the fix (single-worker uvicorn already set `TCP_NODELAY`) and still saturates at 500/s, because one process is CPU-bound. **Compose now defaults to 4 workers with 1 thread each**, and a plain start was checked to run 4 worker processes with the new protocol.
+
+**The next limit.** Single exploratory runs with 4 × 1 saturated at 750/s (10,233 completed, about 680 a second, with 1,017 dropped and 5% fallback) and at 1,000/s (11,314 completed, 3,686 dropped). Fallback stayed low, so the scorer deadline is not the main limit there. The candidates are the API's 20-connection pool held during the scorer call, scorer CPU and PostgreSQL commit cost. This has not been diagnosed.
+
+**Correction.** The follow-up section below said 500/s still saturated with 4 × 1, "so the scorer is no longer the only limit". The limit was this keep-alive stall in the multi-worker scorer, made worse because the API holds a pooled connection while it waits. The first batch's 1-worker runs did not have the stall; there, the single process was CPU-bound.
+
+Limits: a synthetic workload and model on one machine over Docker networking, not a production capacity claim. There are three repeats per cell, with no confidence intervals. The 750/s and 1,000/s figures are single runs. Tests: pytest 25 passed and 2 skipped (3 new), Ruff clean. The Kotlin code did not change, so Gradle was not rerun.
+
+## Load-test follow-up: scorer settings and two database fixes, 22 October 2026
+
+These runs came after the first batch below, while the database was growing and other applications were loading the Mac (load average up to 24.7). Treat the latencies as indicative. Record: [`bench/full_path_followup_2026-10-22.json`](bench/full_path_followup_2026-10-22.json).
+
+- **Scorer settings.** The scorer can now run several worker processes (`PAYGUARD_SCORE_WORKERS`, default 1) and cap ONNX Runtime and LightGBM threads per request (`PAYGUARD_SCORER_THREADS`, default 0, meaning no cap). A test shows the cap changes no score, decision or reason code. Results:
+
+  | Setting | 250/s p50 / p99 | 250/s fallback | 500/s p50 | 500/s fallback | 500/s dropped |
+  |---|---:|---:|---:|---:|---:|
+  | 1 worker, default threads (first batch) | 16.2 / 69.0 ms | 114 | 1,254 ms | 4,005 | 1,703 |
+  | 4 workers, default threads | 51.4 / 216.5 ms | 50 | 1,424 ms | 167 | 2,283 |
+  | 4 workers, 1 thread each | **3.8 / 59.3 ms** | **10** | 1,058 ms | 12 | 976 |
+
+  With default threads, each request used one thread per core: the scorer container peaked at 807% CPU while the API stayed under 45%. Extra workers therefore oversubscribed the CPU and made latency worse. Capping each worker to one thread gave the best 250/s figures measured. 500/s still saturated, so the scorer is no longer the only limit. The defaults are unchanged; the best setting here was 4 workers with 1 thread each. *(Later the same day the repeated runs above traced that 500/s limit to a keep-alive stall in the multi-worker scorer, fixed it, and made 4 workers × 1 thread the default.)*
+- **Outbox polling scanned the whole table.** The publisher's pending-rows query had no matching index. At 83,041 rows each poll took 48 ms, every 100 ms while idle, which is why PostgreSQL used CPU with no traffic and why later runs got slower. Migration `V3__outbox_pending_index.sql` adds a partial index on pending rows; the same poll now takes 0.04 ms.
+- **The journal-balance check scanned all postings.** The deferred trigger that verifies each journal at commit sums postings by `journal_id`, which had no index. On about 184,000 postings each check took 7–30 ms, and 200 card issues took 10.5 s. Migration `V4__postings_journal_index.sql` adds the index: each check now takes 0.13–0.40 ms, and 200 card issues took 4.2 s (busy host, indicative).
+- **Tried and not adopted.** Calling the scorer before opening the authorization transaction would stop the scorer wait from holding a pooled connection and the card-row lock. A test confirmed that the current code does hold the card lock while scoring. But an interleaved A/B at 250/s could not separate the two variants, because both degraded with database growth and host load. Without a clean result the payment path was left as it was.
+- **Tests:** Gradle 21 (2 new index-plan tests), pytest 22 passed and 2 skipped (1 new thread-cap test), Ruff clean.
+
+## Full scored path under load, 22 October 2026
+
+The whole packaged stack ran (`make up`): PostgreSQL 16, Redis 7.4, Kafka 3.9.1, the Kotlin API with `PAYGUARD_MODEL_MODE=enforce`, the outbox publisher, the Python ONNX scorer (one uvicorn process), the feature and case consumers, the case API and the console. k6 2.3.0 ran natively on the same Apple M3 Pro (18 GiB; Docker Desktop with 11.67 GiB) using the new mixed workload `bench/load_full.js`:
+- one fresh card per authorization, each on its own device and usual merchant category;
+- amounts from SGD 1.20 to 800, and merchant risk from 0.05 to 0.9;
+- about 3% abroad, plus 4% small-amount bursts on one card from a new device.
+
+Each run lasted 15 seconds, with card setup excluded from timing. "Cold" means the API and scorer containers were restarted just before the run. The rules-only rows used the same workload and the same running stream, with only the API's model mode switched off. Summary: [`bench/full_path_load_2026-10-22.json`](bench/full_path_load_2026-10-22.json); raw k6 summaries: [`bench/full_path_k6/`](bench/full_path_k6/).
+
+| Mode | Offered | Completed | Dropped | p50 | p95 | p99 | Rules fallback | Queues drained after run | Cases opened |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Scored, cold | 100/s | 1,501 | 0 | 10.0 ms | 20.3 ms | 33.2 ms | 0 | ≈2 s | 823 |
+| Scored, warm | 100/s | 1,500 | 0 | 8.7 ms | 20.3 ms | 42.0 ms | 2 (0.1%) | ≈3 s | 821 |
+| Scored, warm | 250/s | 3,751 | 0 | 16.2 ms | 52.5 ms | 69.0 ms | 114 (3.0%) | ≈6 s | 1,986 |
+| Scored, warm | 500/s | 5,798 | **1,703** | **1,254 ms** | 1,653 ms | 1,944 ms | **4,005 (69%)** | ≈9 s | 979 |
+| Rules only | 100/s | 1,501 | 0 | 1.8 ms | 3.0 ms | 4.3 ms | – | ≈2 s | 0 |
+| Rules only | 250/s | 3,750 | 0 | 1.6 ms | 2.6 ms | 4.3 ms | – | ≈3 s | 0 |
+| Rules only | 500/s | 7,501 | 0 | 1.5 ms | 3.4 ms | 15.7 ms | – | ≈3 s | 0 |
+
+No run had an HTTP or authorization error. The scored path handled 250/s with a p99 of 69 ms and 3% fallback. At 500/s it saturated: requests queued behind the single scorer process, 69% of completed authorizations fell back to rules after the 50 ms scorer limit, latency rose above a second, and k6 dropped 1,703 of 7,501 scheduled iterations because no virtual user was free. Rules-only on the same workload handled 500/s at 3.4 ms p95, so the scorer, not PostgreSQL or Kafka, set the ceiling. In every run the outbox, feature consumer and case consumer caught up within about 10 s of the run ending (polled every few seconds, so these times are approximate). Cases open only from a model score, so rules-only runs opened none.
+
+The decline share (58% at 100/s) comes from this synthetic workload and model, not from any fraud rate. Two earlier workload designs gave cards several purchases seconds apart, which the synthetic model treats as near-certain fraud (85–98% declined). They were discarded before these measurements. These are single runs on one machine. They are not comparable with the 11 October rules-only runs below, which used a different script, an older k6 and a paused stream.
+
+## Analyst identity, review history and shared case store, 20 October 2026 (evening)
+
+All data here is synthetic seeded events. Docker was not used, and the Kotlin API was unchanged, so the 19 Gradle tests were not rerun.
+
+- **Python tests.** `pytest` passed **21 tests with 2 skipped**, up from 9, and Ruff passed. Seven governance tests cover the role rules (an `analyst` may view and draft but cannot review, read or purge the audit trail), a lead's decision being recorded once with history and audit rows, no re-drafting after review, audited reads, re-ingestion not reopening a case, the retention floor, and an old SQLite file gaining the new columns. Five API tests show that local mode ignores a name sent in the request body, that proxy mode answers 401 for a missing or wrong token (or no configured token) and 403 for an unknown role or missing user, that an analyst gets 403 on review and audit, and that a second review gets 400 and an unknown case 404.
+- **PostgreSQL (opt-in, 2 tests).** A disposable PostgreSQL 18.4 cluster was started from the Homebrew binaries, with its data in a temporary folder and listening only on 127.0.0.1:55433. Both tests passed: the store survives reopening with its history and audit trail, and when two store instances review the same case concurrently, exactly one review is recorded. The race test passed 5 of 5 repeated runs. The cluster was then stopped and deleted, and the everyday PostgreSQL on port 5432 was not touched. `psycopg` 3.3.6 is the new optional `postgres` extra.
+- **Frontend.** The console no longer has an analyst-name field. It shows "Recording as *name* (*role*)" from `GET /me`, disables the review buttons for `analyst`, and lists the review history. Vitest passed **3 tests** (one new) and `npm run build` passed.
+- **Headless-Chrome case review: 10/10** ([evidence](bench/case_review_browser.json)). This used Chrome 155.0.8059.85 and Playwright 1.64.0, the new optional `browser` extra. The case API ran in proxy mode behind the Vite dev proxy, with browser-set headers standing in for an authenticating proxy, a disposable SQLite store, and Ollama off, so the rules fallback wrote the draft. Without headers the console showed the 401 message and no cases. The analyst drafted a case whose four citations (`auth_small_0` to `auth_small_3`) all appear in its evidence list, and saw disabled review buttons and no name field. The lead's approval appeared as "APPROVED by lee (lead)" with the note, after which the buttons disappeared. The audit trail named `ana` for `draft_saved` and `lee` for `review_recorded`, a second review was refused, and the analyst got 403 on `/audit`.
+- **Not done.** No real identity provider or proxy. The packaged Compose stack still uses SQLite and local mode, and was not run. There was no full scored-path load test at that point (it was run on 22 October; see above).
+
+## Settlement integrity audit and synthetic settlement fixture, 20 October 2026
+
+`./gradlew test` (Java 21.0.12.1, Gradle 9.7.1, PostgreSQL 16 through Testcontainers using the cached `postgres:16` image) passed **19 tests, 0 skipped**, up from 13. The six new tests cover the capture-to-journal audit:
+- a clean capture is reported as posted;
+- a capture missing from **both** its journal and the network file is reported as `MISSING_JOURNAL`;
+- duplicate capture journals are flagged;
+- a wrong-currency journal is flagged and never counted as settled;
+- an amount mismatch is caught even when the network row agrees with the posting;
+- the full synthetic fixture runs through the reconciler without the harness reading labels.
+
+The audit is available as `GET /v1/settlements/integrity?date=…` and in every reconcile report. Python `pytest` passed **9 tests**, two of them new fixture tests. The frontend passed 2 Vitest tests, one of them a new journal-audit panel check, and the build passed.
+
+The fixture `payguard-settlement-synthetic-v1` (seed 20261020, settlement date 2026-01-15) is generated by `fraud/src/payguard_fraud/settlement_fixture.py` from its own case table, not from PayGuard's sample endpoint. It has 51 ledger captures with injected journal faults, 51 network rows and 105 labels kept in a separate file the reconciler never reads. A regeneration on 20 October produced byte-identical CSV files. Scoring the harness output gave **105/105 labels correct**, with 0 unexpected predictions:
+- 46 discrepancy positives, all flagged with the exact class;
+- 59 clean negatives, with 0 false discrepancies;
+- every class correct, including 6 `MISSING_JOURNAL` (3 of them also absent from the network file), 3 duplicate-journal, 3 wrong-currency and 6 journal-amount-mismatch cases.
+
+The output and score are in [`bench/settlement_fixture/reconciler_output.json`](bench/settlement_fixture/reconciler_output.json) and [`bench/settlement_fixture/score.json`](bench/settlement_fixture/score.json). **Limits:** the same author wrote the case specification and the reconciler, and the labels follow by construction. The score shows that the code implements the documented classification on inputs it did not generate. It is not real card-network evidence, and the fixture is not independent real data.
+
+**Remote CI (public snapshot only).** GitHub Actions run [39288317832](https://github.com/anir2212/payguard/actions/runs/39288317832) for public PR #2 (commit `3fcdeb0c`) passed its `kotlin`, `python`, `frontend` and `images` jobs on 19 October 2026 (UTC). That run is of the public snapshot repository, before the settlement audit was added; it does not cover these changes.
+
 ## Kotlin ledger and API
 
 On macOS arm64, Java 17, Gradle 9.7.1, and PostgreSQL 16, the 15 October 2026 offline `./gradlew test` run passed **13 tests**: five domain/property tests and eight PostgreSQL integration tests. The original twelve cover scoring-mode/fallback, settlement classifications, concurrent company limits, and payment lifecycle. The added test checks the journal-backed settlement source. Property checks include 200 FX values and 250 randomized debit/credit pairs. A seeded integration test executed 40 authorization → partial capture → final capture sequences, with refunds on 20, and found no journal with fewer than two postings or a nonzero posting sum. A direct SQL insert of an unbalanced journal failed at commit. These are local tests, not a proof for all schedules, overflow conditions, or failures.
 
 A separate live Ktor REST smoke issued one synthetic card, activated it, approved an SGD 1,250-minor-unit authorization, captured it, and read an available balance of SGD 8,750 minor units from an initial SGD 10,000. `/openapi.yaml` returned HTTP 200.
 
-### k6 authorization throughput
+### k6 authorization throughput (rules-only, 11 October)
 
 Measured on an **Apple M3 Pro with 18 GiB host memory**, macOS 15.3.1, Java 17, PostgreSQL 16 in Docker. The Kotlin API ran in **rules-only (`PAYGUARD_MODEL_MODE=off`)** mode. Kafka, Redis, Grafana, and Prometheus were paused; the PostgreSQL outbox still wrote events, but its publisher was paused. Each k6 run used a 15-second constant-arrival-rate target and **fresh synthetic cards** with velocity controls raised for load testing. Card setup traffic is excluded from the custom `auth_duration` trend. Raw summaries are in [`bench/`](bench/).
 
@@ -58,4 +167,4 @@ An earlier live API smoke generated and reconciled a sample containing one captu
 
 The React console built with TypeScript/Vite. The packaged Nginx console and its reverse proxy served HTTP 200 for the page, recent authorization events, and cases. The optional Prometheus/Grafana profile started from locally cached digest-pinned images; Prometheus reported both Kotlin and scoring scrape targets **up**, and Grafana's API listed the provisioned PayGuard dashboard. A synthetic pair of authorizations incremented `APPROVED=1`, `DECLINED=1`, `RULES_FALLBACK=1`, and `MODEL_DECLINE=1` counters. The scoring API exposes duration and score histograms plus a PSI gauge after 100 scores. A 200-request benchmark using one synthetic card produced a high PSI; this intentionally narrow traffic mix is not a representative drift assessment.
 
-The Kotlin API, locked Linux scoring, and console Docker images built locally. The frontend's analyst review flow passed its Vitest/React Testing Library check, and the TypeScript/Vite build passed. The GitHub Actions workflow is authored but **has not run remotely**. The local observability start was verified here.
+The Kotlin API, locked Linux scoring, and console Docker images built locally. The frontend's analyst review flow passed its Vitest/React Testing Library check, and the TypeScript/Vite build passed. At that time the GitHub Actions workflow was authored but **had not run remotely**; see the 20 October note above for the later public-snapshot run. The local observability start was verified here.

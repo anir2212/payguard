@@ -85,8 +85,14 @@ services:
     image: payguard-score:local
     build: {context: ./fraud, dockerfile: Dockerfile}
     profiles: [packaged]
+    # Scoring only reads card history, so several worker processes are safe.
+    # The custom protocol sets TCP_NODELAY, which uvicorn skips with --workers > 1.
+    command: [".venv/bin/uvicorn", "payguard_fraud.score_api:app", "--host", "0.0.0.0",
+              "--port", "18086", "--workers", "${PAYGUARD_SCORE_WORKERS:-4}",
+              "--http", "payguard_fraud.nodelay:NoDelayH11Protocol"]
     environment:
       PAYGUARD_REDIS_URL: redis://redis:6379/0
+      PAYGUARD_SCORER_THREADS: "${PAYGUARD_SCORER_THREADS:-1}"
     ports: ["127.0.0.1:18086:18086"]
     depends_on:
       redis: {condition: service_healthy}
