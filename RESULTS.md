@@ -1,5 +1,23 @@
 # PayGuard measured results
 
+## Saturation re-measured after the CPU savings, 22 October 2026 (evening)
+
+This is the same ladder as the late-afternoon saturation section, run with both CPU changes in (reason codes only for declines, and batched Kafka traffic). Each run used a fresh database and the default 4 scorer workers × 1 thread. There were two passes, the second in reverse order. CPU was measured as in the sections below. Record: [`bench/full_path_knee_2026-10-22_evening.json`](bench/full_path_knee_2026-10-22_evening.json).
+
+| Offered | Pass 1: completed / dropped, p50 / p99 | Pass 2: completed / dropped, p50 / p99 | Before the changes (single run) |
+|---:|---:|---:|---:|
+| 750/s | 11,126 / 125, 9 / 604 ms | 10,940 / 311, 11 / 899 ms | 10,932 / 318 |
+| 850/s | 12,113 / 638, 28 / 1,216 ms | 12,608 / 142, 8 / 573 ms | 9,273 / 3,477 |
+| 950/s | 12,172 / 2,079, 1,026 / 1,661 ms | 13,893 / 357, 28 / 753 ms | — |
+| 1,050/s | 9,695 / 6,055, 1,587 / 2,264 ms | 13,911 / 1,839, 741 / 1,650 ms | — |
+
+- **The ceiling moved up.** At 850/s the stack now completes 12,100–12,600 of 12,750 authorizations, against 9,273 before, and the best completed rate was about 925 a second, against about 730.
+- **750/s is no cleaner than before.** Both passes dropped a few percent with a p99 near 0.6–0.9 s, so the point where everything completes comfortably is still around 700/s.
+- **Near saturation the runs disagree.** The first pass collapsed at 950/s where the second held. On this laptop the ceiling is a range, roughly 850–925 completed a second, rather than one number. Ordinary desktop applications were open and used about one core.
+- No run had errors; overload showed up as dropped iterations and rules fallback.
+
+Limits: two passes per rate, k6 on the same machine, and a synthetic workload.
+
 ## Batched Kafka publishing and offset commits, 22 October 2026 (evening)
 
 Kafka was the third-largest CPU user per authorization (about 1.4 ms). The outbox publisher waited for each record's acknowledgement and ran one UPDATE per row, and both Python consumers made a synchronous offset commit after every message. That is three broker round trips per authorization before any fetches. Now the publisher sends a whole polled batch (up to 100 rows), flushes once, checks every acknowledgement and marks the rows with one `UPDATE … WHERE id = ANY(?)`. The consumers take up to 500 messages per `consume()` call and commit once after the whole batch is applied. Record: [`bench/kafka_batching_2026-10-22.json`](bench/kafka_batching_2026-10-22.json).
