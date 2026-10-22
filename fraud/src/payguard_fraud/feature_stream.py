@@ -10,6 +10,8 @@ from confluent_kafka import Consumer
 
 from payguard_fraud.score_api import FeatureStore, ScoreRequest, to_event
 
+BATCH = 500
+
 
 def main() -> None:
     broker = os.getenv("PAYGUARD_KAFKA_BROKERS", "127.0.0.1:19092")
@@ -24,17 +26,19 @@ def main() -> None:
     consumer.subscribe(["payguard.authorization"])
     try:
         while True:
-            message = consumer.poll(1.0)
-            if message is None:
-                continue
-            if message.error():
-                raise RuntimeError(str(message.error()))
-            payload = json.loads(message.value())
-            request = ScoreRequest.model_validate(payload["request"] | {
-                "timestamp": payload["timestamp"]
-            })
-            store.observe(to_event(request))
-            consumer.commit(message=message, asynchronous=False)
+            # One synchronous commit per batch, after every event in it is applied.
+            # A crash mid-batch replays the batch; observe() skips seen event IDs.
+            messages = consumer.consume(num_messages=BATCH, timeout=1.0)
+            for message in messages:
+                if message.error():
+                    raise RuntimeError(str(message.error()))
+                payload = json.loads(message.value())
+                request = ScoreRequest.model_validate(payload["request"] | {
+                    "timestamp": payload["timestamp"]
+                })
+                store.observe(to_event(request))
+            if messages:
+                consumer.commit(asynchronous=False)
     finally:
         consumer.close()
 

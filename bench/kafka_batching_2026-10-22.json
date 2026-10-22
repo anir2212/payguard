@@ -1,0 +1,339 @@
+{
+  "what": "A/B of batched Kafka publishing and offset commits against the previous code, full scored path at 600/s",
+  "date": "2026-10-22",
+  "hardware": "Apple M3 Pro, 11 cores, 18 GiB; Docker Desktop VM with 11 CPUs and 11.67 GiB; k6 2.3.0 natively on the same Mac",
+  "change": {
+    "outbox": "OutboxPublisher sends the whole polled batch (up to 100 rows) before waiting, flushes once, checks every acknowledgement, then marks the rows published with one UPDATE ... WHERE id = ANY(?). Before: send().get() and one UPDATE per row.",
+    "consumers": "feature_stream and case_stream take up to 500 messages per consume() call and make one synchronous offset commit after the whole batch is applied. Before: one synchronous commit per message."
+  },
+  "method": "Same as bench/explain_ab_2026-10-22.json: a fresh Compose project per run, default 4 scorer workers x 1 thread and PAYGUARD_EXPLAIN=declines in both builds, a 15 s warm-up at 100/s, then 15 s of bench/load_full.js. CPU is each container's cgroup usage_usec over the measured window divided by completed authorizations. The before images were built from the previous version of the code, the batched images from this one; image tags were swapped per run. Order: before, batched, batched, before, before, batched. A shared lock kept other heavy jobs on the machine off during the runs, but other light work may have run.",
+  "runs": [
+    {
+      "label": "b1",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 8969,
+      "dropped_iterations": 32,
+      "auth_errors": 0,
+      "model_decline": 5082,
+      "model_approve": 3716,
+      "rules_fallback": 171,
+      "p50_ms": 8.3,
+      "p95_ms": 212.8,
+      "p99_ms": 411.9,
+      "cpu_window_s": 14.7,
+      "container_cpu_ms_per_auth": 8.47,
+      "cpu_ms_per_auth_by_container": {
+        "api": 2.02,
+        "cases-api": 0.01,
+        "cases-worker": 0.36,
+        "console": 0.0,
+        "features": 0.53,
+        "kafka": 1.45,
+        "outbox": 0.69,
+        "postgres": 0.97,
+        "redis": 0.17,
+        "score": 2.26
+      }
+    },
+    {
+      "label": "f1",
+      "build": "batched (working tree)",
+      "offered_per_s": 600,
+      "completed": 9001,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "model_decline": 5171,
+      "model_approve": 3770,
+      "rules_fallback": 60,
+      "p50_ms": 6.2,
+      "p95_ms": 132.6,
+      "p99_ms": 306.9,
+      "cpu_window_s": 14.7,
+      "container_cpu_ms_per_auth": 6.34,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.75,
+        "cases-api": 0.0,
+        "cases-worker": 0.32,
+        "console": 0.0,
+        "features": 0.19,
+        "kafka": 0.53,
+        "outbox": 0.35,
+        "postgres": 0.88,
+        "redis": 0.13,
+        "score": 2.18
+      }
+    },
+    {
+      "label": "f2",
+      "build": "batched (working tree)",
+      "offered_per_s": 600,
+      "completed": 9000,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "model_decline": 5188,
+      "model_approve": 3775,
+      "rules_fallback": 37,
+      "p50_ms": 4.6,
+      "p95_ms": 82.1,
+      "p99_ms": 187.2,
+      "cpu_window_s": 14.3,
+      "container_cpu_ms_per_auth": 5.34,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.49,
+        "cases-api": 0.0,
+        "cases-worker": 0.34,
+        "console": 0.0,
+        "features": 0.17,
+        "kafka": 0.39,
+        "outbox": 0.27,
+        "postgres": 0.71,
+        "redis": 0.11,
+        "score": 1.85
+      }
+    },
+    {
+      "label": "b2",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 9000,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "model_decline": 5187,
+      "model_approve": 3781,
+      "rules_fallback": 32,
+      "p50_ms": 7.2,
+      "p95_ms": 58.8,
+      "p99_ms": 171.0,
+      "cpu_window_s": 14.8,
+      "container_cpu_ms_per_auth": 8.21,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.79,
+        "cases-api": 0.0,
+        "cases-worker": 0.43,
+        "console": 0.0,
+        "features": 0.53,
+        "kafka": 1.49,
+        "outbox": 0.67,
+        "postgres": 0.93,
+        "redis": 0.16,
+        "score": 2.21
+      }
+    },
+    {
+      "label": "b3",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 9001,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "model_decline": 5013,
+      "model_approve": 3938,
+      "rules_fallback": 50,
+      "p50_ms": 6.7,
+      "p95_ms": 135.5,
+      "p99_ms": 318.2,
+      "cpu_window_s": 14.3,
+      "container_cpu_ms_per_auth": 7.71,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.71,
+        "cases-api": 0.0,
+        "cases-worker": 0.42,
+        "console": 0.0,
+        "features": 0.51,
+        "kafka": 1.38,
+        "outbox": 0.61,
+        "postgres": 0.86,
+        "redis": 0.15,
+        "score": 2.06
+      }
+    },
+    {
+      "label": "f3",
+      "build": "batched (working tree)",
+      "offered_per_s": 600,
+      "completed": 9000,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "model_decline": 4984,
+      "model_approve": 3921,
+      "rules_fallback": 95,
+      "p50_ms": 8.3,
+      "p95_ms": 150.8,
+      "p99_ms": 318.7,
+      "cpu_window_s": 14.4,
+      "container_cpu_ms_per_auth": 7.17,
+      "cpu_ms_per_auth_by_container": {
+        "api": 2.03,
+        "cases-api": 0.0,
+        "cases-worker": 0.34,
+        "console": 0.0,
+        "features": 0.21,
+        "kafka": 0.59,
+        "outbox": 0.4,
+        "postgres": 1.02,
+        "redis": 0.14,
+        "score": 2.42
+      }
+    }
+  ],
+  "medians": {
+    "before": {
+      "container_cpu_ms_per_auth": {
+        "median": 8.21,
+        "range": [
+          7.71,
+          8.47
+        ]
+      },
+      "kafka": {
+        "median": 1.45,
+        "range": [
+          1.38,
+          1.49
+        ]
+      },
+      "outbox": {
+        "median": 0.67,
+        "range": [
+          0.61,
+          0.69
+        ]
+      },
+      "features": {
+        "median": 0.53,
+        "range": [
+          0.51,
+          0.53
+        ]
+      },
+      "cases-worker": {
+        "median": 0.42,
+        "range": [
+          0.36,
+          0.43
+        ]
+      },
+      "api": {
+        "median": 1.79,
+        "range": [
+          1.71,
+          2.02
+        ]
+      },
+      "postgres": {
+        "median": 0.93,
+        "range": [
+          0.86,
+          0.97
+        ]
+      },
+      "score": {
+        "median": 2.21,
+        "range": [
+          2.06,
+          2.26
+        ]
+      },
+      "p99_ms": {
+        "median": 318.2,
+        "range": [
+          171.0,
+          411.9
+        ]
+      },
+      "dropped_iterations": {
+        "median": 0,
+        "range": [
+          0,
+          32
+        ]
+      }
+    },
+    "batched": {
+      "container_cpu_ms_per_auth": {
+        "median": 6.34,
+        "range": [
+          5.34,
+          7.17
+        ]
+      },
+      "kafka": {
+        "median": 0.53,
+        "range": [
+          0.39,
+          0.59
+        ]
+      },
+      "outbox": {
+        "median": 0.35,
+        "range": [
+          0.27,
+          0.4
+        ]
+      },
+      "features": {
+        "median": 0.19,
+        "range": [
+          0.17,
+          0.21
+        ]
+      },
+      "cases-worker": {
+        "median": 0.34,
+        "range": [
+          0.32,
+          0.34
+        ]
+      },
+      "api": {
+        "median": 1.75,
+        "range": [
+          1.49,
+          2.03
+        ]
+      },
+      "postgres": {
+        "median": 0.88,
+        "range": [
+          0.71,
+          1.02
+        ]
+      },
+      "score": {
+        "median": 2.18,
+        "range": [
+          1.85,
+          2.42
+        ]
+      },
+      "p99_ms": {
+        "median": 306.9,
+        "range": [
+          187.2,
+          318.7
+        ]
+      },
+      "dropped_iterations": {
+        "median": 0,
+        "range": [
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "findings": [
+    "Kafka broker CPU per authorization fell from a median 1.45 ms (1.38-1.49) to 0.53 ms (0.39-0.59); every batched run was below every before run.",
+    "The outbox publisher fell from 0.67 to 0.35 ms and the feature consumer from 0.53 to 0.19 ms per authorization; the case consumer, which writes SQLite per event, barely changed (0.42 to 0.34).",
+    "Stack CPU per authorization fell from a median 8.21 ms (7.71-8.47) to 6.34 ms (5.34-7.17), about 23%; the highest batched run is below the lowest before run.",
+    "All batched runs completed 9,000 or 9,001 of 9,001 with no errors; the before runs dropped 32, 0 and 0.",
+    "API, PostgreSQL and scorer CPU did not change consistently; their run-to-run spread (for example the scorer 1.85-2.42 ms) is larger than any effect."
+  ],
+  "semantics": "Delivery stays at least once. Rows are marked published only after every record in the batch is acknowledged; a failed send rolls the transaction back and the batch is sent again later (test: outboxRowsStayPendingWhenASendFails). Consumers commit only after every message in the batch is applied, so a crash replays at most one batch; both stores already ignore repeated auth IDs (test: fraud/tests/test_stream_commits.py). Per-partition order is kept because the idempotent producer allows at most five in-flight requests.",
+  "limits": [
+    "one machine with k6 on it",
+    "three runs per build at a single rate (600/s); the knee was not re-measured",
+    "synthetic workload"
+  ]
+}
