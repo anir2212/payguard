@@ -26,7 +26,7 @@ An A/B at 600/s compared old and new API images only, in alternating order on fr
 - **No measurable difference.** The ranges overlap. The changes are kept because they are correct and remove one SQL statement per transaction, but they are not a CPU saving that can be claimed.
 - **One "before" run was disturbed and is excluded.** It dropped 3,188 iterations, returned 133 errors and had a p99 of 5 s, with every container's CPU per authorization about three times the others. The cause was not identified; the run is kept in the evidence.
 - **Don't compare across days.** The same code used about 5.1 ms per authorization here against 6.3 ms on 22 October, so compare runs only within one A/B.
-- **Where savings would come from:** fewer round trips or less serialization per authorization rather than micro-fixes. For example, the three spend and velocity aggregates could be one query, and the card and controls reads could be joined.
+- **Where savings would come from:** not from merging spend queries. In this workload the cards carry only a velocity control, so the day and month spend queries never run. An approved authorization makes ten SQL statements (nine for a decline) plus the commit: idempotency read, card lock, controls read, velocity count, holds sum, posting balance, authorization insert, attempt insert, outbox insert and idempotency write. Joining the card and controls reads, or the holds and balance reads, would save at most two round trips, which is probably below what this A/B can resolve. The more useful next measurement is the ladder from a second machine.
 
 Limits: one excluded run, one machine with k6 on it, and a synthetic workload.
 

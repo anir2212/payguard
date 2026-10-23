@@ -206,7 +206,7 @@
     "No measurable difference: with b2 excluded, the before runs used 5.05 and 5.19 ms of stack CPU per authorization (API 1.38 and 1.47 ms) and the after runs 4.70-5.47 ms (API 1.26-1.52 ms); the ranges overlap.",
     "Run b2 (before) was disturbed: 3,188 dropped iterations, 133 errors and p99 5 s, with every container's CPU per authorization about three times the others. The cause was not identified; it is reported and excluded.",
     "Absolute CPU per authorization was lower on 23 October than in the 22 October runs of the same code (about 5.1 against 6.3 ms), so compare runs only within one A/B.",
-    "The API's cost is spread across framework, serialization, driver and HTTP-client work. Further savings need fewer round trips or less serialization per authorization (for example, merging the three spend and velocity aggregates into one query), not micro-fixes."
+    "The API's cost is spread across framework, serialization, driver and HTTP-client work. In this workload cards carry only a velocity control, so the spend aggregates never run; an approved authorization makes ten SQL statements plus the commit. Joining the card and controls reads, or the holds and balance reads, would save at most two round trips, probably below this A/B's resolution."
   ],
   "limits": [
     "three runs per build with one excluded",
