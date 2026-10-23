@@ -27,6 +27,9 @@ data class AuthorizationView(
     val currency: String, val billingMinor: Long, val status: String, val capturedBillingMinor: Long,
 )
 
+private val MCC_CODE = Regex("[0-9]{4}")
+private val COUNTRY_CODE = Regex("[A-Z]{2}")
+
 private data class AuthRow(
     val cardId: String, val merchantId: String, val currency: String, val amount: Long,
     val billing: Long, val fx: FxRate, val capturedAmount: Long, val capturedBilling: Long,
@@ -67,8 +70,8 @@ class PaymentService(
         val result = database.transaction { connection ->
         once(connection, request.idempotencyKey, "authorize", json.encodeToString(request)) {
             require(request.authId.startsWith("auth_") && request.cardId.startsWith("card_"))
-            require(request.merchantId.isNotBlank() && request.mcc.matches(Regex("[0-9]{4}")))
-            require(request.country.matches(Regex("[A-Z]{2}")))
+            require(request.merchantId.isNotBlank() && request.mcc.matches(MCC_CODE))
+            require(request.country.matches(COUNTRY_CODE))
             require(request.latitude.isFinite() && request.latitude in -90.0..90.0)
             require(request.longitude.isFinite() && request.longitude in -180.0..180.0)
             require(request.homeLatitude.isFinite() && request.homeLatitude in -90.0..90.0)

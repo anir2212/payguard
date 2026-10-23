@@ -4,8 +4,13 @@ import com.payguard.domain.OperationResult
 import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 import java.sql.Connection
+import java.util.HexFormat
 
 private val json = Json { encodeDefaults = true }
+
+/** Lowercase hex SHA-256 of the canonical request body, as stored in `idempotency.request_hash`. */
+internal fun requestHash(requestJson: String): String =
+    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(requestJson.toByteArray()))
 
 /** One request key has one operation and one exact canonical request body. */
 internal fun once(
@@ -16,8 +21,7 @@ internal fun once(
     work: () -> OperationResult,
 ): OperationResult {
     require(key.length in 8..128) { "idempotency key must have 8-128 characters" }
-    val hash = MessageDigest.getInstance("SHA-256").digest(requestJson.toByteArray())
-        .joinToString("") { "%02x".format(it) }
+    val hash = requestHash(requestJson)
     connection.prepareStatement(
         "SELECT operation,request_hash,response::text FROM idempotency WHERE request_key=? FOR UPDATE"
     ).use { statement ->

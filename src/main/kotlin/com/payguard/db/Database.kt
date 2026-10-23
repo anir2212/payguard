@@ -29,8 +29,9 @@ class Database(
         var last: SQLException? = null
         repeat(8) { attempt ->
             pool.connection.use { connection ->
+                // Every transaction uses READ COMMITTED, which the pool sets once per connection;
+                // setting it again here cost PostgreSQL an extra SET on every transaction.
                 connection.autoCommit = false
-                connection.transactionIsolation = Connection.TRANSACTION_READ_COMMITTED
                 try {
                     val result = block(connection)
                     connection.commit()

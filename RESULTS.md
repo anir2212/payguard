@@ -1,5 +1,35 @@
 # PayGuard measured results
 
+## Profiling the API, 23 October 2026
+
+The Kotlin API was the next-largest CPU user after the scorer (about 1.75 ms per authorization at 600/s on 22 October). Java Flight Recorder ran inside the API container during a 30-second run at 600/s, sampling every millisecond with 512-frame stacks. Only the 1,210 samples inside the measured window were counted. Record: [`bench/api_profile_ab_2026-10-23.json`](bench/api_profile_ab_2026-10-23.json); the raw recordings were not kept.
+
+- **There is no hotspot.** No single frame took more than 3% of samples. The time is spread over Ktor's request pipeline and coroutines, JSON encoding and decoding, the PostgreSQL driver and the JDK HTTP client calling the scorer.
+- **Removable items:**
+  - Formatting the idempotency hash as hex one byte at a time with `String.format` took 3.1%.
+  - Regex matching took about 4%. Compiling each validation regex on every request was a further 0.8% in a coarser recording.
+  - Separately, `Database.transaction` set READ COMMITTED on every transaction although the pool already sets it, which costs PostgreSQL one extra statement per transaction.
+
+All three were changed:
+- the hash uses `HexFormat`, with identical output, checked against the FIPS 180-2 test vector;
+- the regexes are compiled once;
+- the redundant `SET` is gone.
+
+An A/B at 600/s compared old and new API images only, in alternating order on fresh databases:
+
+| CPU per authorization | Before (2 runs) | After (3 runs) |
+|---|---:|---:|
+| Whole stack | 5.05, 5.19 ms | 4.70–5.47 ms |
+| API | 1.38, 1.47 ms | 1.26–1.52 ms |
+| PostgreSQL | 0.66, 0.69 ms | 0.58–0.72 ms |
+
+- **No measurable difference.** The ranges overlap. The changes are kept because they are correct and remove one SQL statement per transaction, but they are not a CPU saving that can be claimed.
+- **One "before" run was disturbed and is excluded.** It dropped 3,188 iterations, returned 133 errors and had a p99 of 5 s, with every container's CPU per authorization about three times the others. The cause was not identified; the run is kept in the evidence.
+- **Don't compare across days.** The same code used about 5.1 ms per authorization here against 6.3 ms on 22 October, so compare runs only within one A/B.
+- **Where savings would come from:** fewer round trips or less serialization per authorization rather than micro-fixes. For example, the three spend and velocity aggregates could be one query, and the card and controls reads could be joined.
+
+Limits: one excluded run, one machine with k6 on it, and a synthetic workload.
+
 ## Saturation re-measured after the CPU savings, 22 October 2026 (evening)
 
 This is the same ladder as the late-afternoon saturation section, run with both CPU changes in (reason codes only for declines, and batched Kafka traffic). Each run used a fresh database and the default 4 scorer workers × 1 thread. There were two passes, the second in reverse order. CPU was measured as in the sections below. Record: [`bench/full_path_knee_2026-10-22_evening.json`](bench/full_path_knee_2026-10-22_evening.json).

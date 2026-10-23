@@ -2,6 +2,7 @@ package com.payguard.service
 
 import com.payguard.db.Database
 import com.payguard.db.Ledger
+import com.payguard.domain.CURRENCY_CODE
 import com.payguard.domain.CardLifecycle
 import com.payguard.domain.CardState
 import com.payguard.domain.CardView
@@ -21,7 +22,7 @@ class CardService(private val database: Database) {
         once(connection, request.idempotencyKey, "issue", json.encodeToString(request)) {
             require(request.companyId.isNotBlank() && request.holder.isNotBlank())
             require(request.limitMinor > 0)
-            require(request.currency.matches(Regex("[A-Z]{3}")))
+            require(request.currency.matches(CURRENCY_CODE))
             val cardId = "card_${UUID.randomUUID()}"
             connection.prepareStatement("INSERT INTO companies(id) VALUES (?) ON CONFLICT DO NOTHING").use {
                 it.setString(1, request.companyId)
