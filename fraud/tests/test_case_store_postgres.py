@@ -75,3 +75,28 @@ def test_concurrent_reviews_from_two_stores_record_exactly_one(store) -> None:
     assert sorted(outcomes) == ["recorded", "refused"]
     assert len(store.reviews("case_auth_1")) == 1
     assert store.case("case_auth_1")["status"] in {"APPROVED", "REJECTED"}
+
+
+def test_concurrent_first_opens_create_the_schema_once(store) -> None:
+    """The API and the worker open the store at the same moment on a fresh database."""
+    import psycopg
+
+    with psycopg.connect(DSN, autocommit=True) as db:
+        db.execute("DROP TABLE IF EXISTS case_audit, case_reviews, cases, events")
+    barrier = threading.Barrier(4)
+    errors: list[BaseException] = []
+
+    def open_store() -> None:
+        barrier.wait()
+        try:
+            CaseStore(dsn=DSN)
+        except BaseException as exc:  # noqa: BLE001 - record any failure for the assert
+            errors.append(exc)
+
+    threads = [threading.Thread(target=open_store) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert CaseStore(dsn=DSN).list_cases() == []

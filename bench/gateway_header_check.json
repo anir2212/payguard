@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-10-23T10:58:43+00:00",
+  "what": "Headers the gateway config passes upstream, against stand-in services",
+  "images": {
+    "nginx": "nginx:1.27.2-alpine",
+    "stand_in": "python:3.12-slim"
+  },
+  "client_sent": {
+    "X-PayGuard-User": "mallory",
+    "X-PayGuard-Role": "lead",
+    "X-PayGuard-Proxy-Token": "guessed",
+    "X-PayGuard-Extra": "anything",
+    "X-Payguard-Role-Override": "lead",
+    "Authorization": "Bearer client-token",
+    "X-Forwarded-User": "mallory",
+    "Accept": "application/json"
+  },
+  "passed": 7,
+  "total": 7,
+  "checks": {
+    "no_session_401_before_upstream": true,
+    "case_api_gets_gateway_identity": true,
+    "case_api_gets_no_other_x_payguard_header": true,
+    "case_api_gets_no_cookie_or_authorization": true,
+    "post_body_and_content_type_pass": true,
+    "unmapped_email_gets_no_role_header": true,
+    "payments_api_gets_no_x_payguard_header": true
+  },
+  "observed": {
+    "case_api_received": {
+      "host": "127.0.0.1:18129",
+      "accept": "application/json",
+      "x-forwarded-for": "172.25.0.1",
+      "x-payguard-user": "analyst@payguard.local",
+      "x-payguard-role": "analyst",
+      "x-payguard-proxy-token": "check-only-token",
+      "connection": "close"
+    },
+    "unmapped_email_received": {
+      "host": "127.0.0.1:18129",
+      "accept": "application/json",
+      "x-forwarded-for": "172.25.0.1",
+      "x-payguard-user": "visitor@payguard.local",
+      "x-payguard-proxy-token": "check-only-token",
+      "connection": "close"
+    },
+    "payments_api_received": {
+      "host": "127.0.0.1:18129",
+      "accept": "application/json",
+      "x-forwarded-for": "172.25.0.1",
+      "connection": "close"
+    }
+  },
+  "limits": [
+    "Stand-in upstreams, not the real oauth2-proxy or APIs; the real stack is covered by identity_stack_check.json.",
+    "The proxy token here is a throwaway value for this check."
+  ]
+}

@@ -1,5 +1,53 @@
 # PayGuard measured results
 
+## Packaged sign-in and PostgreSQL case store, 23 October 2026
+
+The packaged stack now puts an nginx gateway, oauth2-proxy and a local Dex identity provider in front of the console and case API. The case API runs in proxy mode, and `cases-api` and `cases-worker` share their own PostgreSQL database. Everything ran in a disposable Compose project (`p09idcheck`) on an Apple M3 Pro (11 cores) with Docker Desktop 29.5.3, and was removed with its volumes afterwards. All data was synthetic. Record: [`bench/packaged_identity_2026-10-23.json`](bench/packaged_identity_2026-10-23.json), with image versions and IDs.
+
+The check lists were committed before the first stack run. **The first attempt did not pass**: the identity check got 21/22, the browser run stopped at its first page, and the header check got 1/7. There were three causes:
+- nginx rewrote the relative sign-in redirect to the container's own port 80;
+- oauth2-proxy's default `approval_prompt=force` made Dex show a consent screen at every sign-in;
+- the header check sent requests before its stand-in was listening.
+
+After fixing all three (`absolute_redirect off`, `--approval-prompt=auto`, and a stricter readiness wait), the stack was rebuilt from empty volumes and every check was rerun. The counts below come from that rerun.
+
+| Check | Passed | Evidence |
+|---|---:|---|
+| Gateway headers, against stand-in upstreams | 7/7 | [`gateway_header_check.json`](bench/gateway_header_check.json) |
+| Sign-in, roles and PostgreSQL store through the gateway | 22/22 | [`identity_stack_check.json`](bench/identity_stack_check.json) |
+| Headless Chrome through the real gateway and Dex login | 11/11 | [`case_review_stack_browser.json`](bench/case_review_stack_browser.json) |
+| `make case-review-browser` (dev path: Vite proxy, browser-set headers, SQLite) | 10/10 | [`case_review_browser.json`](bench/case_review_browser.json) |
+
+- **Signed out.**
+  - A case API call or payments API call through the gateway gets 401.
+  - A page load is redirected to `/oauth2/start`, and from there to Dex's login form.
+  - A wrong password gets 401 from Dex, and a non-JWT bearer token gets 401.
+  - Forged `X-PayGuard-User`, `-Role` and `-Proxy-Token` headers without a session get 401, even with the default proxy token. Nothing listens on 127.0.0.1:18087.
+- **Forged headers while signed in.** The analyst sent `X-PayGuard-Role: lead`, `X-PayGuard-User: mallory` and a proxy token. `/me` still reported `analyst@payguard.local` (analyst), and a review attempt got 403. In the browser, the console showed the analyst identity with the review buttons disabled.
+- **What the gateway forwards.** Run against a stand-in that echoes headers, the case API received only `Host`, `Accept`, `X-Forwarded-For`, the three identity headers set by the gateway, and nginx's `Connection` header. `X-PayGuard-Extra`, `X-Payguard-Role-Override`, `Authorization`, `Cookie` and `X-Forwarded-User` were dropped, and POST bodies and `Content-Type` arrived intact. An email missing from the role table arrived with no role header. The payments API received no `X-PayGuard-*` header.
+- **Roles.**
+  - An analyst could list, read and draft a case, but got 403 on review and on `/audit`.
+  - A lead's decision was recorded under `lead@payguard.local`, and a second decision on the same case got 400.
+  - In the browser, the history read "APPROVED by lead@payguard.local (lead)", and the audit trail named the analyst for `draft_saved` and the lead for `review_recorded`.
+  - Signing out at `/oauth2/sign_out` ended the session: the next API call got 401.
+- **PostgreSQL.**
+  - The decision, the review-history row and the audit rows (`case_opened` by `system:case-stream`, `draft_saved`, `review_recorded`) were read back from `payguard_cases`.
+  - After `docker compose restart cases-api`, the API answered again within 0.5 s. The same decision and history came back, and the earlier audit rows were unchanged.
+  - The `payguard_cases` role was refused a connection to the ledger database. Running the database init a second time exited 0.
+- **Concurrent decisions.** For each of five cases, two lead requests (APPROVED and REJECTED) were released together through the gateway. Every pair gave one 200 and one 400, and each case stored exactly one review. This used one `cases-api` process, with FastAPI's thread pool and two database connections. The cross-process race is the opt-in test below.
+- **Schema setup.** Four openers ran the table creation at once on an empty database, 10 times. Without a lock, all 10 repeats raised `UniqueViolation` in three of the four openers. With `CaseStore`'s advisory lock, none of the 10 did. The three opt-in PostgreSQL tests, including a new concurrent-first-open test, passed against a `payguard_cases_it` database on the stack's PostgreSQL 16.15.
+- **Authorization smoke.** The simulator made eight enforce-mode authorizations. The first was approved by rules fallback, as expected after a cold start, and the other seven were model declines at score 1.0, with 13.9–74.8 ms per API call. The case worker opened seven cases in PostgreSQL from Kafka. The simulator then signed in as the demo analyst with Dex's password grant and drafted the last case through the gateway (rules-fallback draft, eight citations, `drafted_by` set to the analyst). Its report was written inside the container, so `bench/burst_results.json` is still the 11 October run.
+- **Tests.** `./gradlew cleanTest test` passed **24 tests** (Kotlin unchanged). `pytest` passed **33 with 3 skipped**: two new simulator sign-in tests, and the new PostgreSQL test, which skips without `PAYGUARD_TEST_PG_DSN`. With the DSN set, all three PostgreSQL tests passed. Ruff passed, and Vitest passed 3.
+- **The dev-path browser review** was rerun with Chrome 156.0.8078.47, so `bench/case_review_browser.json` now records this run rather than the 20 October one.
+- **Limits.**
+  - The demo users, client secret, cookie secret and proxy token are public local-demo-only values.
+  - Everything is plain HTTP on loopback, and the cookie is not marked secure.
+  - Roles come from a table in the gateway config, not from Dex groups.
+  - The Kotlin API's own port 8086 is still open without authentication, for scripts.
+  - Cases in the old `casesdata` SQLite volume are not migrated.
+  - No load test has been run with the PostgreSQL case store. The 22 October CPU and saturation figures used SQLite for cases, and PostgreSQL now does that work as well.
+  - Audit retention is still the seven-year placeholder.
+
 ## Profiling the API, 23 October 2026
 
 The Kotlin API was the next-largest CPU user after the scorer (about 1.75 ms per authorization at 600/s on 22 October). Java Flight Recorder ran inside the API container during a 30-second run at 600/s, sampling every millisecond with 512-frame stacks. Only the 1,210 samples inside the measured window were counted. Record: [`bench/api_profile_ab_2026-10-23.json`](bench/api_profile_ab_2026-10-23.json); the raw recordings were not kept.
@@ -199,8 +247,8 @@ All data here is synthetic seeded events. Docker was not used, and the Kotlin AP
 - **Python tests.** `pytest` passed **21 tests with 2 skipped**, up from 9, and Ruff passed. Seven governance tests cover the role rules (an `analyst` may view and draft but cannot review, read or purge the audit trail), a lead's decision being recorded once with history and audit rows, no re-drafting after review, audited reads, re-ingestion not reopening a case, the retention floor, and an old SQLite file gaining the new columns. Five API tests show that local mode ignores a name sent in the request body, that proxy mode answers 401 for a missing or wrong token (or no configured token) and 403 for an unknown role or missing user, that an analyst gets 403 on review and audit, and that a second review gets 400 and an unknown case 404.
 - **PostgreSQL (opt-in, 2 tests).** A disposable PostgreSQL 18.4 cluster was started from the Homebrew binaries, with its data in a temporary folder and listening only on 127.0.0.1:55433. Both tests passed: the store survives reopening with its history and audit trail, and when two store instances review the same case concurrently, exactly one review is recorded. The race test passed 5 of 5 repeated runs. The cluster was then stopped and deleted, and the everyday PostgreSQL on port 5432 was not touched. `psycopg` 3.3.6 is the new optional `postgres` extra.
 - **Frontend.** The console no longer has an analyst-name field. It shows "Recording as *name* (*role*)" from `GET /me`, disables the review buttons for `analyst`, and lists the review history. Vitest passed **3 tests** (one new) and `npm run build` passed.
-- **Headless-Chrome case review: 10/10** ([evidence](bench/case_review_browser.json)). This used Chrome 155.0.8059.85 and Playwright 1.64.0, the new optional `browser` extra. The case API ran in proxy mode behind the Vite dev proxy, with browser-set headers standing in for an authenticating proxy, a disposable SQLite store, and Ollama off, so the rules fallback wrote the draft. Without headers the console showed the 401 message and no cases. The analyst drafted a case whose four citations (`auth_small_0` to `auth_small_3`) all appear in its evidence list, and saw disabled review buttons and no name field. The lead's approval appeared as "APPROVED by lee (lead)" with the note, after which the buttons disappeared. The audit trail named `ana` for `draft_saved` and `lee` for `review_recorded`, a second review was refused, and the analyst got 403 on `/audit`.
-- **Not done.** No real identity provider or proxy. The packaged Compose stack still uses SQLite and local mode, and was not run. There was no full scored-path load test at that point (it was run on 22 October; see above).
+- **Headless-Chrome case review: 10/10** ([evidence](bench/case_review_browser.json), since overwritten by the 23 October rerun, also 10/10). This used Chrome 155.0.8059.85 and Playwright 1.64.0, the new optional `browser` extra. The case API ran in proxy mode behind the Vite dev proxy, with browser-set headers standing in for an authenticating proxy, a disposable SQLite store, and Ollama off, so the rules fallback wrote the draft. Without headers the console showed the 401 message and no cases. The analyst drafted a case whose four citations (`auth_small_0` to `auth_small_3`) all appear in its evidence list, and saw disabled review buttons and no name field. The lead's approval appeared as "APPROVED by lee (lead)" with the note, after which the buttons disappeared. The audit trail named `ana` for `draft_saved` and `lee` for `review_recorded`, a second review was refused, and the analyst got 403 on `/audit`.
+- **Not done at that point.** No real identity provider or proxy, and the packaged Compose stack still used SQLite and local mode (both added on 23 October; see above). There was no full scored-path load test at that point (it was run on 22 October; see above).
 
 ## Settlement integrity audit and synthetic settlement fixture, 20 October 2026
 
@@ -269,7 +317,7 @@ The latest packaged [`demo.py`](fraud/src/payguard_fraud/demo.py) end-to-end run
 
 The LangGraph flow retrieves synthetic case evidence through five read-only tools, requests a local Ollama classification, validates the pattern/action against observed signals, attaches only transaction IDs from retrieved evidence, and returns a recommendation with `PENDING_ANALYST` status. On **40 generated template cases** (30 fraud, 10 benign), the full guarded workflow had **40/40 template pattern matches, 40/40 action matches, and zero invented cited IDs**. The 0.5B local model produced **12 accepted drafts**; **28 used the deterministic rules fallback**. These are workflow safety checks against hand-built labels, **not independent LLM accuracy or analyst agreement**. See [`case_eval_ollama_results.json`](bench/case_eval_ollama_results.json).
 
-A Kafka case consumer ingested the end-to-end burst events into a local SQLite queue and opened cases. The analyst API generated a cited `card_testing` draft for the final burst event using observed timestamps and amounts, with `draftSource=ollama` and `approvalStatus=PENDING_ANALYST`. Analyst approval records a review decision only; it does not execute a card freeze or customer contact.
+In the 11 October packaged run, a Kafka case consumer ingested the end-to-end burst events into a local SQLite queue and opened cases (the packaged stack has used PostgreSQL for cases since 23 October). The analyst API generated a cited `card_testing` draft for the final burst event using observed timestamps and amounts, with `draftSource=ollama` and `approvalStatus=PENDING_ANALYST`. Analyst approval records a review decision only; it does not execute a card freeze or customer contact.
 
 ## Settlement reconciliation
 
@@ -279,6 +327,6 @@ An earlier live API smoke generated and reconciled a sample containing one captu
 
 ## Observability and console
 
-The React console built with TypeScript/Vite. The packaged Nginx console and its reverse proxy served HTTP 200 for the page, recent authorization events, and cases. The optional Prometheus/Grafana profile started from locally cached digest-pinned images; Prometheus reported both Kotlin and scoring scrape targets **up**, and Grafana's API listed the provisioned PayGuard dashboard. A synthetic pair of authorizations incremented `APPROVED=1`, `DECLINED=1`, `RULES_FALLBACK=1`, and `MODEL_DECLINE=1` counters. The scoring API exposes duration and score histograms plus a PSI gauge after 100 scores. A 200-request benchmark using one synthetic card produced a high PSI; this intentionally narrow traffic mix is not a representative drift assessment.
+The React console built with TypeScript/Vite. In the 11 October packaged smoke, the Nginx console and its reverse proxy served HTTP 200 for the page, recent authorization events, and cases; since 23 October those requests need a signed-in session at the gateway. The optional Prometheus/Grafana profile started from locally cached digest-pinned images; Prometheus reported both Kotlin and scoring scrape targets **up**, and Grafana's API listed the provisioned PayGuard dashboard. A synthetic pair of authorizations incremented `APPROVED=1`, `DECLINED=1`, `RULES_FALLBACK=1`, and `MODEL_DECLINE=1` counters. The scoring API exposes duration and score histograms plus a PSI gauge after 100 scores. A 200-request benchmark using one synthetic card produced a high PSI; this intentionally narrow traffic mix is not a representative drift assessment.
 
 The Kotlin API, locked Linux scoring, and console Docker images built locally. The frontend's analyst review flow passed its Vitest/React Testing Library check, and the TypeScript/Vite build passed. At that time the GitHub Actions workflow was authored but **had not run remotely**; see the 20 October note above for the later public-snapshot run. The local observability start was verified here.

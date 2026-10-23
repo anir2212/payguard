@@ -1,0 +1,33 @@
+# Local OpenID Connect identity provider for the packaged demo stack.
+# LOCAL DEMO ONLY: the users, the password ("local-demo-only") and the client
+# secret below are public placeholders, not real credentials. Never reuse them.
+#
+# The browser reaches Dex through the gateway at http://127.0.0.1:18119/dex, so
+# that is the issuer. Containers reach it directly at http://dex:5556/dex.
+issuer: http://127.0.0.1:18119/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+oauth2:
+  skipApprovalScreen: true
+  # Lets scripts (the simulator, the identity check) sign in without a browser.
+  passwordConnector: local
+enablePasswordDB: true
+staticClients:
+  - id: payguard-console
+    name: PayGuard console (local demo)
+    secret: local-demo-only-client-secret
+    redirectURIs:
+      - http://127.0.0.1:18119/oauth2/callback
+# Both demo users have the password "local-demo-only" (bcrypt hash below).
+# Their PayGuard role is assigned by the gateway's map, not by Dex.
+staticPasswords:
+  - email: lead@payguard.local
+    username: lead
+    userID: 4ed5ab62-bbfa-46a3-b56a-52cfca1834ec
+    hash: "$2a$10$Cfyq4XDL/eNV1OyWuJHh2eztmsAG.2ItSx./Qk.K6Xft6Rd9ud2sa"
+  - email: analyst@payguard.local
+    username: analyst
+    userID: b2f43b87-88c2-4365-a1b2-e72e3e0960b5
+    hash: "$2a$10$Cfyq4XDL/eNV1OyWuJHh2eztmsAG.2ItSx./Qk.K6Xft6Rd9ud2sa"

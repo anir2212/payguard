@@ -31,6 +31,7 @@ DECISIONS = {"APPROVED", "REJECTED"}
 # younger than this are never purged.
 MIN_AUDIT_RETENTION_DAYS = 365 * 7
 SYSTEM = None  # Marker for ingestion by the stream worker.
+SCHEMA_LOCK_KEY = 0x50475F4341534553  # Advisory-lock key for schema setup ("PG_CASES").
 
 
 class Forbidden(PermissionError):
@@ -97,6 +98,10 @@ class CaseStore:
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._tx() as db:
+            if self.dialect == "postgres":
+                # The API and the worker start together. Concurrent CREATE ... IF NOT
+                # EXISTS can still collide in PostgreSQL's catalog, so take turns.
+                db.execute("SELECT pg_advisory_xact_lock(?)", (SCHEMA_LOCK_KEY,))
             for statement in _schema(self.dialect):
                 db.execute(statement)
             if self.dialect == "sqlite":

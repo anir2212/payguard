@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
 COPY pyproject.toml uv.lock ./
 COPY src ./src
 RUN pip install --no-cache-dir uv==0.11.21 \
-    && uv sync --locked --extra serve --extra export --extra agent --no-dev \
+    && uv sync --locked --extra serve --extra export --extra agent --extra postgres --no-dev \
     && .venv/bin/python -m payguard_fraud.train --output artifacts \
     && .venv/bin/python -m payguard_fraud.export_onnx --artifacts artifacts
 ENV PAYGUARD_MODEL_DIR=/opt/payguard/artifacts

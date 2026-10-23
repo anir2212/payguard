@@ -1,4 +1,4 @@
-.PHONY: case-review-browser up down build simulate test run stream-up stream-down topics outbox observe-up observe-down
+.PHONY: case-review-browser case-review-stack-browser identity-check up down build simulate test run stream-up stream-down topics outbox observe-up observe-down
 
 up:
 	docker compose --profile stream --profile packaged up -d --build
@@ -38,3 +38,10 @@ observe-down:
 
 case-review-browser:
 	cd fraud && .venv/bin/python -m payguard_fraud.case_review_browser
+
+# Need the packaged stack (make up). Each writes compact evidence under bench/.
+identity-check:
+	cd fraud && .venv/bin/python -m payguard_fraud.stack_identity_check --project payguard
+
+case-review-stack-browser:
+	cd fraud && .venv/bin/python -m payguard_fraud.case_review_stack_browser

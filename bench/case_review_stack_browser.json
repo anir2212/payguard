@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-10-23T10:58:58+00:00",
+  "what": "Headless Chrome case review through the gateway, oauth2-proxy and Dex login",
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-15.3.1-arm64-arm-64bit",
+    "chrome": "156.0.8078.47",
+    "playwright": "1.64.0"
+  },
+  "passed": 11,
+  "total": 11,
+  "checks": {
+    "signed_out_page_shows_idp_login": true,
+    "signed_out_case_api_401": true,
+    "analyst_signed_in_through_idp": true,
+    "forged_lead_headers_ignored": true,
+    "analyst_draft_citations_in_evidence": true,
+    "analyst_review_buttons_disabled": true,
+    "analyst_review_request_403": true,
+    "analyst_audit_request_403": true,
+    "lead_decision_recorded_under_idp_identity": true,
+    "audit_names_drafter_and_decider": true,
+    "sign_out_ends_session": true
+  },
+  "observed": {
+    "case_id": "case_auth_browser_ac46d452_3",
+    "login_page_path": "/dex/auth/local/login",
+    "analyst_me_with_forged_headers": {
+      "name": "analyst@payguard.local",
+      "role": "analyst",
+      "permissions": [
+        "draft",
+        "view"
+      ],
+      "mode": "proxy"
+    },
+    "citations": [
+      "auth_browser_ac46d452_0",
+      "auth_browser_ac46d452_1",
+      "auth_browser_ac46d452_2",
+      "auth_browser_ac46d452_3"
+    ],
+    "evidence": [
+      "auth_browser_ac46d452_0",
+      "auth_browser_ac46d452_1",
+      "auth_browser_ac46d452_2",
+      "auth_browser_ac46d452_3"
+    ],
+    "history": "APPROVED by lead@payguard.local (lead) \u00b7 23 Oct 2026, 6:59 pm \u00b7 Confirmed card testing",
+    "audit_actions": [
+      [
+        "system:case-stream",
+        "case_opened"
+      ],
+      [
+        "analyst@payguard.local",
+        "view_case"
+      ],
+      [
+        "analyst@payguard.local",
+        "view_case"
+      ],
+      [
+        "analyst@payguard.local",
+        "draft_saved"
+      ],
+      [
+        "analyst@payguard.local",
+        "view_case"
+      ],
+      [
+        "lead@payguard.local",
+        "view_case"
+      ],
+      [
+        "lead@payguard.local",
+        "review_recorded"
+      ],
+      [
+        "lead@payguard.local",
+        "view_case"
+      ]
+    ]
+  },
+  "limits": [
+    "Synthetic seeded events in the stack's PostgreSQL case database.",
+    "Demo users with a public local-only password; loopback HTTP, no TLS.",
+    "Draft text came from whichever path the case API took (Ollama or rules)."
+  ]
+}

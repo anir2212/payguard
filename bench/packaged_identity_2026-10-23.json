@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-23",
+  "what": "Packaged stack with Dex, oauth2-proxy and an nginx gateway in front of the console and case API, and the PostgreSQL case store",
+  "hardware": "Apple M3 Pro, 11 cores, macOS; Docker Desktop engine 29.5.3; all services and checks on one machine, loopback only",
+  "compose_project": "p09idcheck (disposable; removed with its volumes afterwards)",
+  "images": {
+    "dex": "ghcr.io/dexidp/dex:v2.41.1 (bc7cfce7c17f)",
+    "oauth2_proxy": "quay.io/oauth2-proxy/oauth2-proxy:v7.7.1 (f6a4aa83a27e)",
+    "gateway": "nginx:1.27.2-alpine (74175cf34632)",
+    "postgres": "postgres:16 (ca0bd484cb98), server 16.15",
+    "payguard_score": "payguard-score:local (0ecf9a1acbcc), built with --extra postgres",
+    "payguard_api": "payguard-api:local (ff62bcaf8670)",
+    "payguard_console": "payguard-console:local (a0ba78cf0758)"
+  },
+  "evidence_files": {
+    "gateway_headers": "bench/gateway_header_check.json (7/7)",
+    "identity_and_store": "bench/identity_stack_check.json (22/22)",
+    "browser_through_idp": "bench/case_review_stack_browser.json (11/11)",
+    "browser_dev_path": "bench/case_review_browser.json (10/10)"
+  },
+  "first_attempt": {
+    "result": "identity check 21/22; the stack browser run stopped at its first page load; the gateway header check 1/7",
+    "causes": [
+      "nginx turned the relative sign-in redirect into http://127.0.0.1/oauth2/start (port 80, the container's own port). Fixed with absolute_redirect off.",
+      "oauth2-proxy's default approval_prompt=force made Dex show a consent screen on every sign-in. Fixed with --approval-prompt=auto.",
+      "The header check started sending requests while its stand-in upstream was still starting (502s). Its readiness wait now requires the stand-in's 401."
+    ],
+    "after_fixes": "The stack was removed with its volumes and every check rerun from a fresh start; the counts above are from that rerun."
+  },
+  "case_database": {
+    "init_first_run": ["CREATE ROLE", "CREATE DATABASE", "REVOKE", "REVOKE"],
+    "init_second_run_exit_code": 0,
+    "payguard_cases_role_connect_to_ledger_db": "refused: permission denied for database \"payguard\" (no CONNECT privilege)",
+    "tables_in_payguard_cases_after_start": 4,
+    "schema_race_4_openers_on_fresh_db": {
+      "without_advisory_lock_raw_create_if_not_exists": "10 of 10 repeats raised UniqueViolation in 3 of 4 openers",
+      "with_CaseStore_advisory_lock": "0 of 10 repeats raised an error"
+    },
+    "opt_in_postgres_tests": "3 passed (reopen durability, concurrent review, concurrent first open) against payguard_cases_it on the stack's PostgreSQL"
+  },
+  "authorization_smoke": {
+    "command": "docker compose -p p09idcheck ... --profile simulate run --rm simulator (report written inside the container, so bench/burst_results.json was not overwritten)",
+    "authorizations": 8,
+    "decisions": "1 APPROVED by rules fallback (first call after a cold start), 7 DECLINED by MODEL_DECLINE at score 1.0",
+    "api_ms_range": [13.91, 74.81],
+    "case_path": "Kafka -> cases-worker -> PostgreSQL opened 7 cases for the burst; the simulator signed in as analyst@payguard.local with Dex's password grant and drafted case_auth_demo_2b088f6ebe_7 through the gateway (rules_fallback draft, 8 citations, drafted_by analyst@payguard.local)"
+  },
+  "limits": [
+    "Synthetic data only. Demo users and secrets are public local-demo-only placeholders; plain HTTP on loopback, cookie not marked secure.",
+    "One cases-api process; the gateway race used its thread pool. The two-store race is covered by the opt-in PostgreSQL test.",
+    "No load test was run with the PostgreSQL case store; the 22 October CPU and saturation figures used the SQLite case store.",
+    "Audit retention is still a seven-year placeholder, not an agreed policy."
+  ]
+}

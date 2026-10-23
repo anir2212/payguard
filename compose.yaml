@@ -112,32 +112,103 @@ services:
     depends_on:
       redis: {condition: service_healthy}
       kafka-init: {condition: service_completed_successfully}
+  cases-db-init:
+    image: postgres:16
+    profiles: [packaged]
+    # Creates the case store's role and database if missing; safe on every start.
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "payguard",
+              "-d", "payguard", "-f", "/init/cases_db_init.sql"]
+    environment:
+      PGPASSWORD: local-demo-only
+    volumes: [./deploy/cases_db_init.sql:/init/cases_db_init.sql:ro]
+    depends_on:
+      postgres: {condition: service_healthy}
   cases-api:
     image: payguard-score:local
     profiles: [packaged]
+    # Not published: the gateway (port 18119) is the only way in.
     command: [".venv/bin/uvicorn", "payguard_fraud.case_api:app", "--host", "0.0.0.0", "--port", "18087"]
     environment:
-      PAYGUARD_CASE_DB: /data/cases.sqlite
+      PAYGUARD_CASE_DSN: postgresql://payguard_cases:local-demo-only@postgres:5432/payguard_cases
+      PAYGUARD_AUTH_MODE: proxy
+      # Shared with the gateway only. LOCAL DEMO ONLY default; override for anything else.
+      PAYGUARD_PROXY_TOKEN: "${PAYGUARD_PROXY_TOKEN:-local-demo-only-proxy-token}"
       PAYGUARD_CASE_MODEL: qwen2.5:0.5b
       PAYGUARD_OLLAMA_URL: http://host.docker.internal:11434/api/generate
-    ports: ["127.0.0.1:18087:18087"]
-    volumes: [casesdata:/data]
+    depends_on:
+      cases-db-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18087/health', timeout=5)"]
+      interval: 3s
+      start_period: 10s
+      retries: 20
   cases-worker:
     image: payguard-score:local
     profiles: [packaged]
     command: [".venv/bin/python", "-m", "payguard_fraud.case_stream"]
     environment:
-      PAYGUARD_CASE_DB: /data/cases.sqlite
+      PAYGUARD_CASE_DSN: postgresql://payguard_cases:local-demo-only@postgres:5432/payguard_cases
       PAYGUARD_KAFKA_BROKERS: kafka:9092
-    volumes: [casesdata:/data]
     depends_on:
+      cases-db-init: {condition: service_completed_successfully}
       kafka-init: {condition: service_completed_successfully}
   console:
     image: payguard-console:local
     build: {context: ./frontend, dockerfile: Dockerfile}
     profiles: [packaged]
+    # Static files only; served to the browser through the gateway.
+  dex:
+    # Local OpenID Connect identity provider with two static demo users.
+    image: ghcr.io/dexidp/dex:v2.41.1
+    profiles: [packaged]
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes: [./deploy/dex.yaml:/etc/dex/config.yaml:ro]
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    profiles: [packaged]
+    # The browser signs in at the issuer URL through the gateway, while this
+    # container exchanges codes and fetches keys from Dex directly, so OIDC
+    # discovery is skipped and the endpoints are listed.
+    command:
+      - --http-address=0.0.0.0:4180
+      - --provider=oidc
+      - --client-id=payguard-console
+      - --client-secret=local-demo-only-client-secret
+      - --oidc-issuer-url=http://127.0.0.1:18119/dex
+      - --skip-oidc-discovery=true
+      - --login-url=http://127.0.0.1:18119/dex/auth
+      - --redeem-url=http://dex:5556/dex/token
+      - --oidc-jwks-url=http://dex:5556/dex/keys
+      - --redirect-url=http://127.0.0.1:18119/oauth2/callback
+      - --scope=openid email profile
+      - --email-domain=*
+      - --upstream=static://202
+      - --reverse-proxy=true
+      - --set-xauthrequest=true
+      - --skip-provider-button=true
+      # The default (force) asks Dex for a consent screen on every sign-in.
+      - --approval-prompt=auto
+      # Scripts sign in with Dex's password grant and send the ID token.
+      - --skip-jwt-bearer-tokens=true
+      - --cookie-name=_payguard_session
+      - --cookie-secure=false
+      # LOCAL DEMO ONLY: a public 32-byte placeholder, not a real secret.
+      - --cookie-secret=local-demo-only-cookie-secret-32
+    depends_on: [dex]
+  gateway:
+    # Authenticating reverse proxy in front of the console and both APIs.
+    image: nginx:1.27.2-alpine
+    profiles: [packaged]
+    environment:
+      PAYGUARD_PROXY_TOKEN: "${PAYGUARD_PROXY_TOKEN:-local-demo-only-proxy-token}"
+    volumes: [./deploy/gateway.conf.template:/etc/nginx/templates/default.conf.template:ro]
     ports: ["127.0.0.1:18119:80"]
-    depends_on: [api, cases-api]
+    depends_on:
+      console: {condition: service_started}
+      dex: {condition: service_started}
+      oauth2-proxy: {condition: service_started}
+      api: {condition: service_started}
+      cases-api: {condition: service_healthy}
   simulator:
     image: payguard-score:local
     profiles: [simulate]
@@ -145,9 +216,15 @@ services:
     environment:
       PAYGUARD_API_URL: http://api:8086
       PAYGUARD_REDIS_URL: redis://redis:6379/0
-      PAYGUARD_CASE_API_URL: http://cases-api:18087
+      # The simulator signs in as the demo analyst and calls the case API through the gateway.
+      PAYGUARD_CASE_API_URL: http://gateway/api/cases
+      PAYGUARD_CASE_TOKEN_URL: http://dex:5556/dex/token
+      PAYGUARD_CASE_CLIENT_ID: payguard-console
+      PAYGUARD_CASE_CLIENT_SECRET: local-demo-only-client-secret
+      PAYGUARD_CASE_USER: analyst@payguard.local
+      PAYGUARD_CASE_PASSWORD: local-demo-only
     volumes: [./bench:/opt/payguard/bench]
-    depends_on: [api, cases-worker, features, outbox]
+    depends_on: [api, cases-worker, features, outbox, gateway]
   prometheus:
     image: prom/prometheus@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: [observe]
@@ -176,4 +253,3 @@ volumes:
   kafkadata: {}
   prometheusdata: {}
   grafanadata: {}
-  casesdata: {}

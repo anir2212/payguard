@@ -1,0 +1,100 @@
+# Authenticating gateway for the packaged stack (the only published web port).
+#
+# Every request is checked by oauth2-proxy (`auth_request`), which holds the
+# Dex login session. The gateway then talks to the APIs with an allowlist of
+# request headers: anything the client sent outside the list, including every
+# X-PayGuard-* header, is dropped, and the gateway sets the user, role and the
+# shared proxy token itself. The official nginx image fills in
+# ${PAYGUARD_PROXY_TOKEN} from the environment when the container starts.
+
+# PayGuard role for each signed-in email. Dex proves who someone is; this table
+# says what they may do. An email with no entry gets no role, and the case API
+# answers 403.
+map $payguard_email $payguard_role {
+    default                 "";
+    lead@payguard.local     lead;
+    analyst@payguard.local  analyst;
+}
+
+server {
+    listen 80;
+    server_name _;
+    client_max_body_size 1m;
+    # Keep redirects relative: nginx listens on 80 inside the container, but the
+    # browser reaches it on 127.0.0.1:18119.
+    absolute_redirect off;
+
+    # oauth2-proxy's sign-in, callback and sign-out endpoints.
+    location /oauth2/ {
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $http_host;
+    }
+
+    # Subrequest target: 202 with X-Auth-Request-* headers, or 401.
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header Content-Length "";
+        proxy_pass_request_body off;
+    }
+
+    # The identity provider's login pages and token endpoint (issuer /dex).
+    location /dex/ {
+        proxy_pass http://dex:5556;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/cases/ {
+        auth_request /oauth2/auth;
+        auth_request_set $payguard_email $upstream_http_x_auth_request_email;
+        error_page 401 = @api_signin;
+
+        proxy_pass http://cases-api:18087/;
+        proxy_pass_request_headers off;
+        proxy_set_header Host $http_host;
+        proxy_set_header Accept $http_accept;
+        proxy_set_header Content-Type $content_type;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-PayGuard-User $payguard_email;
+        proxy_set_header X-PayGuard-Role $payguard_role;
+        proxy_set_header X-PayGuard-Proxy-Token "${PAYGUARD_PROXY_TOKEN}";
+    }
+
+    # The Kotlin API has no identity of its own; the console's calls to it
+    # still need a session. (Its loopback port 8086 stays open for scripts.)
+    location /api/payments/ {
+        auth_request /oauth2/auth;
+        error_page 401 = @api_signin;
+
+        proxy_pass http://api:8086/;
+        proxy_pass_request_headers off;
+        proxy_set_header Host $http_host;
+        proxy_set_header Accept $http_accept;
+        proxy_set_header Content-Type $content_type;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    location / {
+        auth_request /oauth2/auth;
+        error_page 401 = @page_signin;
+        proxy_pass http://console:80;
+        proxy_set_header Host $http_host;
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+    }
+
+    location @api_signin {
+        default_type application/json;
+        return 401 '{"detail":"sign in required: open /oauth2/start"}';
+    }
+
+    location @page_signin {
+        return 302 /oauth2/start?rd=$uri;
+    }
+}
