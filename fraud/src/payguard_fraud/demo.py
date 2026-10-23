@@ -6,12 +6,14 @@ and feature propagation; it does not prescribe a particular model outcome.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -21,11 +23,33 @@ from payguard_fraud.score_api import FeatureStore
 from payguard_fraud.simulator import Event
 
 
-def send(url: str, payload: dict, method: str = "POST") -> dict:
+def send(url: str, payload: dict, method: str = "POST", headers: dict | None = None) -> dict:
     request = Request(url, json.dumps(payload).encode(),
-                      {"Content-Type": "application/json"}, method=method)
+                      {"Content-Type": "application/json", **(headers or {})}, method=method)
     with urlopen(request, timeout=10) as response:
         return json.load(response)
+
+
+def case_api_headers() -> dict:
+    """Sign in for the case API when the stack puts it behind the gateway.
+
+    With ``PAYGUARD_CASE_TOKEN_URL`` set, uses the identity provider's password
+    grant for ``PAYGUARD_CASE_USER`` and sends the ID token as a bearer token,
+    which the gateway's oauth2-proxy verifies. Without it, sends nothing (a
+    case API in local mode needs no sign-in).
+    """
+    token_url = os.getenv("PAYGUARD_CASE_TOKEN_URL")
+    if not token_url:
+        return {}
+    client = f"{os.environ['PAYGUARD_CASE_CLIENT_ID']}:{os.environ['PAYGUARD_CASE_CLIENT_SECRET']}"
+    form = urlencode({"grant_type": "password", "scope": "openid email profile",
+                      "username": os.environ["PAYGUARD_CASE_USER"],
+                      "password": os.environ["PAYGUARD_CASE_PASSWORD"]}).encode()
+    request = Request(token_url, form, {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": "Basic " + base64.b64encode(client.encode()).decode()})
+    with urlopen(request, timeout=10) as response:
+        return {"Authorization": f"Bearer {json.load(response)['id_token']}"}
 
 
 def wait_for_observation(client: redis.Redis, auth_id: str, timeout: float = 10.0) -> float:
@@ -97,16 +121,17 @@ def main() -> None:
     case_api = os.getenv("PAYGUARD_CASE_API_URL")
     if case_api:
         case_id = f"case_{decisions[-1]['authId']}"
+        headers = case_api_headers()
         deadline = time.monotonic() + 15
         while True:
             try:
-                with urlopen(f"{case_api}/cases/{case_id}", timeout=5):
+                with urlopen(Request(f"{case_api}/cases/{case_id}", headers=headers), timeout=5):
                     break
             except HTTPError as error:
                 if error.code != 404 or time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
-        report["caseDraft"] = send(f"{case_api}/cases/{case_id}/draft", {})
+        report["caseDraft"] = send(f"{case_api}/cases/{case_id}/draft", {}, headers=headers)
     target = Path(os.getenv("PAYGUARD_DEMO_REPORT", "bench/burst_results.json"))
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, indent=2) + "\n")

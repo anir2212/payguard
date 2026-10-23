@@ -1,0 +1,188 @@
+{
+  "generated_at": "2026-10-23T10:58:56+00:00",
+  "what": "Packaged-stack sign-in, roles and PostgreSQL case store through the gateway",
+  "compose_project": "p09idcheck",
+  "passed": 22,
+  "total": 22,
+  "checks": {
+    "signed_out_case_api_401": true,
+    "signed_out_page_redirects_to_sign_in": true,
+    "sign_in_redirects_to_identity_provider": true,
+    "signed_out_payments_api_401": true,
+    "forged_headers_without_session_401": true,
+    "invalid_bearer_token_401": true,
+    "wrong_password_refused_by_idp": true,
+    "case_api_not_published_on_host": true,
+    "analyst_identity_from_idp": true,
+    "client_role_header_ignored": true,
+    "lead_identity_from_idp": true,
+    "signed_in_payments_api_200": true,
+    "analyst_can_list_and_read": true,
+    "analyst_can_draft": true,
+    "analyst_cannot_decide": true,
+    "analyst_with_forged_lead_header_cannot_decide": true,
+    "analyst_cannot_read_audit": true,
+    "lead_can_decide": true,
+    "second_decision_refused": true,
+    "decision_and_audit_rows_in_postgres": true,
+    "decision_survives_cases_api_restart": true,
+    "concurrent_lead_decisions_record_exactly_one": true
+  },
+  "observed": {
+    "analyst_me": {
+      "name": "analyst@payguard.local",
+      "role": "analyst",
+      "permissions": [
+        "draft",
+        "view"
+      ],
+      "mode": "proxy"
+    },
+    "analyst_me_with_forged_headers": {
+      "name": "analyst@payguard.local",
+      "role": "analyst",
+      "permissions": [
+        "draft",
+        "view"
+      ],
+      "mode": "proxy"
+    },
+    "case_id": "case_auth_idcheck_59f49585_0",
+    "race_cases": [
+      "case_auth_idcheck_59f49585_1",
+      "case_auth_idcheck_59f49585_2",
+      "case_auth_idcheck_59f49585_3",
+      "case_auth_idcheck_59f49585_4",
+      "case_auth_idcheck_59f49585_5"
+    ],
+    "draft_source": "rules_fallback",
+    "postgres_before_restart": {
+      "case": [
+        "APPROVED",
+        "lead@payguard.local",
+        "analyst@payguard.local"
+      ],
+      "reviews": [
+        [
+          "APPROVED",
+          "lead@payguard.local",
+          "lead"
+        ]
+      ],
+      "audit": [
+        [
+          "system:case-stream",
+          "system",
+          "case_opened"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "view_case"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "view_case"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "draft_saved"
+        ],
+        [
+          "lead@payguard.local",
+          "lead",
+          "review_recorded"
+        ]
+      ]
+    },
+    "seconds_until_case_api_answered_after_restart": 0.5,
+    "postgres_after_restart": {
+      "case": [
+        "APPROVED",
+        "lead@payguard.local",
+        "analyst@payguard.local"
+      ],
+      "reviews": [
+        [
+          "APPROVED",
+          "lead@payguard.local",
+          "lead"
+        ]
+      ],
+      "audit": [
+        [
+          "system:case-stream",
+          "system",
+          "case_opened"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "view_case"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "view_case"
+        ],
+        [
+          "analyst@payguard.local",
+          "analyst",
+          "draft_saved"
+        ],
+        [
+          "lead@payguard.local",
+          "lead",
+          "review_recorded"
+        ],
+        [
+          "lead@payguard.local",
+          "lead",
+          "view_case"
+        ]
+      ]
+    },
+    "race_statuses": {
+      "case_auth_idcheck_59f49585_1": [
+        200,
+        400
+      ],
+      "case_auth_idcheck_59f49585_2": [
+        200,
+        400
+      ],
+      "case_auth_idcheck_59f49585_3": [
+        200,
+        400
+      ],
+      "case_auth_idcheck_59f49585_4": [
+        200,
+        400
+      ],
+      "case_auth_idcheck_59f49585_5": [
+        200,
+        400
+      ]
+    },
+    "race_stored_reviews": {
+      "case_auth_idcheck_59f49585_1": 1,
+      "case_auth_idcheck_59f49585_2": 1,
+      "case_auth_idcheck_59f49585_3": 1,
+      "case_auth_idcheck_59f49585_4": 1,
+      "case_auth_idcheck_59f49585_5": 1
+    }
+  },
+  "method": [
+    "Requests go to the gateway on 127.0.0.1:18119 (nginx auth_request to oauth2-proxy).",
+    "Demo users sign in with Dex's password grant; the ID token is sent as a bearer token, which oauth2-proxy verifies against Dex's signing keys.",
+    "Forged headers: X-PayGuard-User=mallory, X-PayGuard-Role=lead and the default local-demo proxy token, sent by the client.",
+    "Race: 5 cases, each with an APPROVED and a REJECTED lead request released together by a barrier; one cases-api process (FastAPI thread pool)."
+  ],
+  "limits": [
+    "Synthetic events seeded with CaseStore.observe, not from Kafka.",
+    "Bearer-token sign-in, not the browser cookie flow (see case_review_stack_browser).",
+    "One machine, loopback only; the demo credentials are public placeholders."
+  ]
+}
