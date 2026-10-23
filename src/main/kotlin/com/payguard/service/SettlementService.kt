@@ -1,6 +1,7 @@
 package com.payguard.service
 
 import com.payguard.db.Database
+import com.payguard.domain.CURRENCY_CODE
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
@@ -169,7 +170,7 @@ class SettlementService(private val database: Database) {
             require(id.startsWith("cap_") && id.all { it.isLetterOrDigit() || it == '_' || it == '-' }) {
                 "invalid capture ID on row ${index + 2}"
             }
-            require(amount != null && amount > 0 && currency.matches(Regex("[A-Z]{3}"))) {
+            require(amount != null && amount > 0 && currency.matches(CURRENCY_CODE)) {
                 "invalid amount or currency on row ${index + 2}"
             }
             val ledger = expected[id]

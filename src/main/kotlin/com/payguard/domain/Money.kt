@@ -2,10 +2,13 @@ package com.payguard.domain
 
 import java.math.BigInteger
 
+/** An ISO-4217 code shape, compiled once rather than per request. */
+val CURRENCY_CODE = Regex("[A-Z]{3}")
+
 /** Minor units only. A currency is explicit even when all local fixtures use SGD. */
 data class MoneyMinor(val minor: Long, val currency: String) {
     init {
-        require(currency.matches(Regex("[A-Z]{3}"))) { "ISO-4217 currency code required" }
+        require(currency.matches(CURRENCY_CODE)) { "ISO-4217 currency code required" }
     }
 
     fun requirePositive(): MoneyMinor {

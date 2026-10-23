@@ -1,0 +1,216 @@
+{
+  "what": "Profile of the Kotlin API under load, and an A/B of three small changes it suggested",
+  "date": "2026-10-23",
+  "hardware": "Apple M3 Pro, 11 cores, 18 GiB; Docker Desktop VM with 11 CPUs and 11.67 GiB; k6 2.3.0 natively on the same Mac",
+  "profile": {
+    "method": "Java Flight Recorder inside the API container (JDK 17) during a 30 s run at 600/s, execution samples every 1 ms with 512-frame stacks; only samples inside the measured window counted (1,210). The raw recordings were not kept.",
+    "result": "No hotspot. The largest single frames were under 3% of samples each, spread over Ktor's request pipeline and coroutines, kotlinx JSON encoding and decoding, the PostgreSQL JDBC driver and the JDK HTTP client calling the scorer. Only about 5% of samples had an application frame on the stack, because most work runs in framework continuations and driver threads.",
+    "removable_items": {
+      "Formatter.format (per-byte hex of the idempotency hash)": "3.1% inclusive",
+      "regex matching (Pattern/Matcher frames)": "about 4% inclusive; precompiling removes compilation, not matching",
+      "Pattern.compile (an earlier, coarser recording)": "0.8%"
+    }
+  },
+  "change": [
+    "Idempotency hash: HexFormat instead of String.format per byte; output unchanged (test against the FIPS 180-2 vector)",
+    "Validation regexes compiled once instead of on every request",
+    "Database.transaction no longer sets READ COMMITTED on every transaction; the pool already sets it once per connection, so PostgreSQL saves one SET statement per transaction"
+  ],
+  "method": "Same as bench/explain_ab_2026-10-22.json: fresh Compose project per run, 600/s, 15 s measured, cgroup CPU per completed authorization. Only the API image differed; order before, after, after, before, before, after. An unrelated PostgreSQL container from another project was idle on the machine throughout.",
+  "runs": [
+    {
+      "label": "b1",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 9001,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "rules_fallback": 17,
+      "p50_ms": 4.5,
+      "p99_ms": 200.2,
+      "container_cpu_ms_per_auth": 5.19,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.47,
+        "cases-api": 0.0,
+        "cases-worker": 0.34,
+        "console": 0.0,
+        "features": 0.17,
+        "kafka": 0.36,
+        "outbox": 0.26,
+        "postgres": 0.69,
+        "redis": 0.12,
+        "score": 1.79
+      },
+      "excluded": false
+    },
+    {
+      "label": "f1",
+      "build": "after",
+      "offered_per_s": 600,
+      "completed": 9001,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "rules_fallback": 14,
+      "p50_ms": 3.9,
+      "p99_ms": 124.2,
+      "container_cpu_ms_per_auth": 4.7,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.26,
+        "cases-api": 0.0,
+        "cases-worker": 0.35,
+        "console": 0.0,
+        "features": 0.15,
+        "kafka": 0.37,
+        "outbox": 0.21,
+        "postgres": 0.58,
+        "redis": 0.1,
+        "score": 1.66
+      },
+      "excluded": false
+    },
+    {
+      "label": "f2",
+      "build": "after",
+      "offered_per_s": 600,
+      "completed": 9000,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "rules_fallback": 40,
+      "p50_ms": 4.7,
+      "p99_ms": 143.1,
+      "container_cpu_ms_per_auth": 5.47,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.52,
+        "cases-api": 0.0,
+        "cases-worker": 0.35,
+        "console": 0.0,
+        "features": 0.18,
+        "kafka": 0.45,
+        "outbox": 0.26,
+        "postgres": 0.71,
+        "redis": 0.12,
+        "score": 1.87
+      },
+      "excluded": false
+    },
+    {
+      "label": "b2",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 5680,
+      "dropped_iterations": 3188,
+      "auth_errors": 133,
+      "rules_fallback": 822,
+      "p50_ms": 35.4,
+      "p99_ms": 5001.4,
+      "container_cpu_ms_per_auth": 15.65,
+      "cpu_ms_per_auth_by_container": {
+        "api": 5.19,
+        "cases-api": 0.03,
+        "cases-worker": 0.44,
+        "console": 0.0,
+        "features": 0.45,
+        "kafka": 1.55,
+        "outbox": 0.99,
+        "postgres": 2.05,
+        "redis": 0.34,
+        "score": 4.61
+      },
+      "excluded": true
+    },
+    {
+      "label": "b3",
+      "build": "before",
+      "offered_per_s": 600,
+      "completed": 9003,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "rules_fallback": 25,
+      "p50_ms": 4.2,
+      "p99_ms": 153.6,
+      "container_cpu_ms_per_auth": 5.05,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.38,
+        "cases-api": 0.0,
+        "cases-worker": 0.34,
+        "console": 0.0,
+        "features": 0.17,
+        "kafka": 0.36,
+        "outbox": 0.25,
+        "postgres": 0.66,
+        "redis": 0.11,
+        "score": 1.77
+      },
+      "excluded": false
+    },
+    {
+      "label": "f3",
+      "build": "after",
+      "offered_per_s": 600,
+      "completed": 9001,
+      "dropped_iterations": 0,
+      "auth_errors": 0,
+      "rules_fallback": 14,
+      "p50_ms": 5.2,
+      "p99_ms": 202.6,
+      "container_cpu_ms_per_auth": 5.47,
+      "cpu_ms_per_auth_by_container": {
+        "api": 1.5,
+        "cases-api": 0.0,
+        "cases-worker": 0.3,
+        "console": 0.0,
+        "features": 0.18,
+        "kafka": 0.46,
+        "outbox": 0.26,
+        "postgres": 0.72,
+        "redis": 0.11,
+        "score": 1.93
+      },
+      "excluded": false
+    }
+  ],
+  "summary_excluding_b2": {
+    "before": {
+      "stack_ms": [
+        5.05,
+        5.19
+      ],
+      "api_ms": [
+        1.38,
+        1.47
+      ],
+      "postgres_ms": [
+        0.66,
+        0.69
+      ]
+    },
+    "after": {
+      "stack_ms": [
+        4.7,
+        5.47,
+        5.47
+      ],
+      "api_ms": [
+        1.26,
+        1.5,
+        1.52
+      ],
+      "postgres_ms": [
+        0.58,
+        0.71,
+        0.72
+      ]
+    }
+  },
+  "findings": [
+    "No measurable difference: with b2 excluded, the before runs used 5.05 and 5.19 ms of stack CPU per authorization (API 1.38 and 1.47 ms) and the after runs 4.70-5.47 ms (API 1.26-1.52 ms); the ranges overlap.",
+    "Run b2 (before) was disturbed: 3,188 dropped iterations, 133 errors and p99 5 s, with every container's CPU per authorization about three times the others. The cause was not identified; it is reported and excluded.",
+    "Absolute CPU per authorization was lower on 23 October than in the 22 October runs of the same code (about 5.1 against 6.3 ms), so compare runs only within one A/B.",
+    "The API's cost is spread across framework, serialization, driver and HTTP-client work. Further savings need fewer round trips or less serialization per authorization (for example, merging the three spend and velocity aggregates into one query), not micro-fixes."
+  ],
+  "limits": [
+    "three runs per build with one excluded",
+    "one machine with k6 on it",
+    "synthetic workload"
+  ]
+}
